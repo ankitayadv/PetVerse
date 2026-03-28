@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -9,75 +10,90 @@ class SignUpScreen extends StatefulWidget {
 }
 
 class _SignUpScreenState extends State<SignUpScreen> {
-  // ✅ CONTROLLERS
+  // Controllers
   final TextEditingController nameController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
 
-  // ✅ LOADING STATE
   bool _isLoading = false;
+  bool _isPasswordVisible = false;
 
-  // ✅ SIGNUP FUNCTION
+  // SIGN UP FUNCTION
   Future<void> signUpUser() async {
-    // Basic Validation
-    if (emailController.text.isEmpty || passwordController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please fill in all fields")),
-      );
+    final name = nameController.text.trim();
+    final email = emailController.text.trim();
+    final password = passwordController.text.trim();
+
+    // Validation
+    if (name.isEmpty || email.isEmpty || password.isEmpty) {
+      _showSnackBar("Please fill in all fields", Colors.red);
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-    });
+    if (!email.contains('@')) {
+      _showSnackBar("Enter a valid email", Colors.red);
+      return;
+    }
+
+    if (password.length < 6) {
+      _showSnackBar("Password must be at least 6 characters", Colors.red);
+      return;
+    }
+
+    setState(() => _isLoading = true);
 
     try {
-      await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: emailController.text.trim(),
-        password: passwordController.text.trim(),
+      // Create user
+      UserCredential credential =
+          await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
       );
 
-      // ✅ SUCCESS → SHOW NOTIFICATION
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Account created successfully! Redirecting..."),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
+      // Save user data to Firestore
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(credential.user!.uid)
+          .set({
+        'uid': credential.user!.uid,
+        'name': name,
+        'email': email,
+        'createdAt': DateTime.now(),
+      });
 
-      // ✅ WAIT A MOMENT THEN GO TO LOGIN
-      await Future.delayed(const Duration(seconds: 2));
-      
-      if (mounted) {
-        Navigator.pushReplacementNamed(context, '/login');
-      }
+      _showSnackBar("Account created successfully!", Colors.green);
 
+      // Navigate to home
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, '/home');
+      }
     } on FirebaseAuthException catch (e) {
-      String message = "Signup Failed";
+      String message = "Signup failed";
 
       if (e.code == 'email-already-in-use') {
-        message = "This email is already registered.";
-      } else if (e.code == 'weak-password') {
-        message = "Password is too weak. Try at least 6 characters.";
+        message = "Email already in use";
       } else if (e.code == 'invalid-email') {
-        message = "The email address is not valid.";
+        message = "Invalid email";
+      } else if (e.code == 'weak-password') {
+        message = "Weak password";
       }
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message), backgroundColor: Colors.red),
-        );
-      }
+      _showSnackBar(message, Colors.red);
+    } catch (e) {
+      _showSnackBar("Something went wrong", Colors.red);
     } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  void _showSnackBar(String message, Color color) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: color,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   @override
@@ -90,138 +106,135 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final height = MediaQuery.of(context).size.height;
-
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
+        title: const Text("Sign Up"),
         backgroundColor: Colors.white,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.orange),
-          onPressed: () => Navigator.pop(context),
-        ),
+        foregroundColor: Colors.orange,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 30.0),
-        child: Column(
-          children: [
-            Image.asset(
-              'assets/images/onboarding_page1.png',
-              height: height * 0.2,
-              errorBuilder: (context, error, stackTrace) => 
-                  const Icon(Icons.pets, size: 80, color: Colors.orange),
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'Join PetVerse',
-              style: TextStyle(
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-                color: Colors.orange,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 30),
+          child: Column(
+            children: [
+              const SizedBox(height: 20),
+
+              const Text(
+                "Create Account",
+                style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
               ),
-            ),
-            const Text(
-              'Create an account to start caring smarter',
-              style: TextStyle(color: Colors.grey),
-            ),
-            const SizedBox(height: 30),
 
-            // ✅ NAME
-            _buildField(
-              controller: nameController,
-              hint: "Full Name",
-              icon: Icons.person_outline,
-            ),
-            const SizedBox(height: 15),
+              const SizedBox(height: 30),
 
-            // ✅ EMAIL
-            _buildField(
-              controller: emailController,
-              hint: "Email",
-              icon: Icons.email_outlined,
-            ),
-            const SizedBox(height: 15),
+              _buildTextField(
+                controller: nameController,
+                label: "Full Name",
+                icon: Icons.person_outline,
+              ),
 
-            // ✅ PASSWORD
-            _buildField(
-              controller: passwordController,
-              hint: "Password",
-              icon: Icons.lock_outline,
-              isPass: true,
-            ),
-            const SizedBox(height: 30),
+              const SizedBox(height: 15),
 
-            // 🔥 UPDATED BUTTON WITH LOADING LOGIC
-            ElevatedButton(
-              onPressed: _isLoading ? null : signUpUser,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.orange,
-                disabledBackgroundColor: Colors.orange.shade200,
-                minimumSize: const Size(double.infinity, 55),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(15),
+              _buildTextField(
+                controller: emailController,
+                label: "Email",
+                icon: Icons.email_outlined,
+                keyboardType: TextInputType.emailAddress,
+              ),
+
+              const SizedBox(height: 15),
+
+              _buildTextField(
+                controller: passwordController,
+                label: "Password",
+                icon: Icons.lock_outline,
+                isPassword: true,
+                obscureText: !_isPasswordVisible,
+                toggleVisibility: () {
+                  setState(() {
+                    _isPasswordVisible = !_isPasswordVisible;
+                  });
+                },
+              ),
+
+              const SizedBox(height: 25),
+
+              ElevatedButton(
+                onPressed: _isLoading ? null : signUpUser,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  minimumSize: const Size(double.infinity, 55),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(15),
+                  ),
                 ),
-              ),
-              child: _isLoading
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        color: Colors.white,
-                        strokeWidth: 2,
+                child: _isLoading
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : const Text(
+                        "Sign Up",
+                        style: TextStyle(fontSize: 18, color: Colors.white),
                       ),
-                    )
-                  : const Text(
-                      "Create Account",
+              ),
+
+              const SizedBox(height: 20),
+
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text("Already have an account? "),
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.pushReplacementNamed(context, '/login');
+                    },
+                    child: const Text(
+                      "Login",
                       style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
+                        color: Colors.orange,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-            ),
-            const SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text("Already have an account? "),
-                GestureDetector(
-                  onTap: () => Navigator.pop(context),
-                  child: const Text(
-                    "Login",
-                    style: TextStyle(
-                      color: Colors.orange,
-                      fontWeight: FontWeight.bold,
-                    ),
                   ),
-                ),
-              ],
-            ),
-          ],
+                ],
+              )
+            ],
+          ),
         ),
       ),
     );
   }
 
-  // ✅ CUSTOM TEXTFIELD
-  Widget _buildField({
+  Widget _buildTextField({
     required TextEditingController controller,
-    required String hint,
+    required String label,
     required IconData icon,
-    bool isPass = false,
+    bool isPassword = false,
+    bool obscureText = false,
+    VoidCallback? toggleVisibility,
+    TextInputType keyboardType = TextInputType.text,
   }) {
-    return TextField(
-      controller: controller,
-      obscureText: isPass,
-      decoration: InputDecoration(
-        hintText: hint,
-        prefixIcon: Icon(icon, color: Colors.orange),
-        filled: true,
-        fillColor: Colors.grey.shade100,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(15),
-          borderSide: BorderSide.none,
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(15),
+      ),
+      child: TextField(
+        controller: controller,
+        obscureText: obscureText,
+        keyboardType: keyboardType,
+        decoration: InputDecoration(
+          hintText: label,
+          prefixIcon: Icon(icon, color: Colors.orange),
+          suffixIcon: isPassword
+              ? IconButton(
+                  icon: Icon(
+                    obscureText ? Icons.visibility_off : Icons.visibility,
+                  ),
+                  onPressed: toggleVisibility,
+                )
+              : null,
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 15),
         ),
       ),
     );

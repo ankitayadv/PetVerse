@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -9,20 +10,33 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  // ✅ CONTROLLERS
+  // ✅ 1. CONTROLLERS
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
 
-  // ✅ LOADING STATE
+  // ✅ 2. STATE VARIABLES
   bool _isLoading = false;
+  bool _isPasswordVisible = false; // Toggle for password visibility
 
-  // ✅ LOGIN FUNCTION
-  Future<void> loginUser() async {
-    // 1. Basic empty check validation
-    if (emailController.text.trim().isEmpty || passwordController.text.trim().isEmpty) {
-      _showSnackBar("Please enter both email and password", Colors.red);
-      return;
+  // ✅ 3. FORM VALIDATION LOGIC
+  bool _isValid() {
+    final email = emailController.text.trim();
+    final password = passwordController.text.trim();
+
+    if (email.isEmpty || password.isEmpty) {
+      _showSnackBar("Please fill in all fields.", Colors.red);
+      return false;
     }
+    if (!RegExp(r"^[a-zA-Z0-9+_.-]+@[a-zA-Z0-9.-]+$").hasMatch(email)) {
+      _showSnackBar("Please enter a valid email address.", Colors.red);
+      return false;
+    }
+    return true;
+  }
+
+  // ✅ 4. LOGIN FUNCTION
+  Future<void> loginUser() async {
+    if (!_isValid()) return;
 
     setState(() => _isLoading = true);
 
@@ -32,50 +46,60 @@ class _LoginScreenState extends State<LoginScreen> {
         password: passwordController.text.trim(),
       );
 
-      // ✅ SUCCESS → SHOW NOTIFICATION
       if (mounted) {
-        _showSnackBar("Login Successful! Welcome back.", Colors.green);
+        _showSnackBar("Welcome back!", Colors.green);
+        // Navigate and clear the stack so user can't go back to login
+        Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
       }
-
-      // Small delay so user can see the success message
-      await Future.delayed(const Duration(seconds: 1));
-
-      if (mounted) {
-        Navigator.pushReplacementNamed(context, '/onboarding');
-      }
-
     } on FirebaseAuthException catch (e) {
       String message = "Login Failed";
-
-      // 2. Specific Firebase Error Handling
       if (e.code == 'user-not-found') {
-        message = "No account found with this email.";
-      } else if (e.code == 'wrong-password') {
-        message = "Incorrect password. Please try again.";
-      } else if (e.code == 'invalid-email') {
-        message = "The email format is invalid.";
-      } else if (e.code == 'user-disabled') {
-        message = "This user account has been disabled.";
-      }
-
-      if (mounted) {
-        _showSnackBar(message, Colors.red);
-      }
+        message = "No user found with this email.";
+      } else if (e.code == 'wrong-password') message = "Incorrect password.";
+      else if (e.code == 'invalid-email') message = "Email format is incorrect.";
+      
+      if (mounted) _showSnackBar(message, Colors.red);
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  // Helper function for SnackBars
+  // ✅ 5. FORGOT PASSWORD FUNCTION
+  Future<void> resetPassword() async {
+    if (emailController.text.isEmpty) {
+      _showSnackBar("Enter email to receive reset link", Colors.orange);
+      return;
+    }
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: emailController.text.trim());
+      _showSnackBar("Reset link sent to your email!", Colors.blue);
+    } catch (e) {
+      _showSnackBar("Error sending reset email", Colors.red);
+    }
+  }
+
+  // ✅ 6. GOOGLE SIGN-IN
+  Future<void> signInWithGoogle() async {
+    setState(() => _isLoading = true);
+    try {
+      final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
+      final GoogleSignInAuthentication? googleAuth = await googleUser?.authentication;
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth?.accessToken,
+        idToken: googleAuth?.idToken,
+      );
+      await FirebaseAuth.instance.signInWithCredential(credential);
+      if (mounted) Navigator.pushReplacementNamed(context, '/home');
+    } catch (e) {
+      if (mounted) _showSnackBar("Google Sign-In cancelled or failed.", Colors.red);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   void _showSnackBar(String message, Color color) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: color,
-        behavior: SnackBarBehavior.floating,
-      ),
+      SnackBar(content: Text(message), backgroundColor: color, behavior: SnackBarBehavior.floating),
     );
   }
 
@@ -95,7 +119,7 @@ class _LoginScreenState extends State<LoginScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: Colors.orange),
-          onPressed: () => Navigator.pushReplacementNamed(context, '/onboarding'),
+          onPressed: () => Navigator.pop(context),
         ),
       ),
       body: SafeArea(
@@ -104,119 +128,71 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             children: [
               const SizedBox(height: 20),
-              Image.asset(
-                'assets/images/onboarding_page1.png',
-                height: 180,
-                errorBuilder: (context, error, stackTrace) =>
-                    const Icon(Icons.pets, size: 100, color: Colors.orange),
-              ),
+              // Use a placeholder if asset is missing
+              Image.asset('assets/images/onboarding_page1.png', height: 180, 
+                errorBuilder: (context, _, _) => const Icon(Icons.lock_person, size: 100, color: Colors.orange)),
               const SizedBox(height: 15),
-              const Text(
-                "Welcome\nBack!",
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+              const Text("Welcome\nBack!", textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
               const SizedBox(height: 30),
 
-              // ✅ EMAIL FIELD
               _buildTextField(
                 controller: emailController,
                 label: "Email",
                 icon: Icons.email_outlined,
+                keyboardType: TextInputType.emailAddress,
               ),
               const SizedBox(height: 15),
 
-              // ✅ PASSWORD FIELD
               _buildTextField(
                 controller: passwordController,
                 label: "Password",
                 icon: Icons.lock_outline,
                 isPassword: true,
+                obscureText: !_isPasswordVisible,
+                toggleVisibility: () => setState(() => _isPasswordVisible = !_isPasswordVisible),
               ),
 
               Align(
                 alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () {
-                    // Handle Forgot Password logic here
-                  },
-                  child: const Text(
-                    "Forgot password?",
-                    style: TextStyle(color: Colors.orange),
-                  ),
-                ),
+                child: TextButton(onPressed: resetPassword, child: const Text("Forgot password?", style: TextStyle(color: Colors.orange))),
               ),
               const SizedBox(height: 10),
 
-              // 🔥 LOGIN BUTTON WITH LOADING INDICATOR
               ElevatedButton(
                 onPressed: _isLoading ? null : loginUser,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.orange,
-                  disabledBackgroundColor: Colors.orange.shade200,
                   minimumSize: const Size(double.infinity, 55),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(15),
-                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                 ),
-                child: _isLoading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : const Text(
-                        "Login",
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                child: _isLoading 
+                  ? const CircularProgressIndicator(color: Colors.white) 
+                  : const Text("Login", style: TextStyle(fontSize: 18, color: Colors.white)),
               ),
+
               const SizedBox(height: 20),
               const Text("or", style: TextStyle(color: Colors.grey)),
               const SizedBox(height: 20),
 
-              // GOOGLE BUTTON (Placeholder style)
               OutlinedButton.icon(
-                onPressed: () {},
+                onPressed: _isLoading ? null : signInWithGoogle,
                 icon: const Icon(Icons.g_mobiledata, size: 30, color: Colors.black),
-                label: const Text(
-                  "Continue with Google",
-                  style: TextStyle(color: Colors.black),
-                ),
+                label: const Text("Continue with Google", style: TextStyle(color: Colors.black)),
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size(double.infinity, 55),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(15),
-                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                 ),
               ),
               const SizedBox(height: 25),
 
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text("Don't have an account? "),
-                  GestureDetector(
-                    onTap: () => Navigator.pushNamed(context, '/signup'),
-                    child: const Text(
-                      "Sign Up",
-                      style: TextStyle(
-                        color: Colors.orange,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+              Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                const Text("Don't have an account? "),
+                GestureDetector(
+                  onTap: () => Navigator.pushNamed(context, '/signup'),
+                  child: const Text("Sign Up", style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold)),
+                ),
+              ]),
             ],
           ),
         ),
@@ -224,24 +200,27 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // ✅ REUSABLE TEXTFIELD
   Widget _buildTextField({
     required TextEditingController controller,
     required String label,
     required IconData icon,
     bool isPassword = false,
+    bool obscureText = false,
+    VoidCallback? toggleVisibility,
+    TextInputType keyboardType = TextInputType.text,
   }) {
     return Container(
-      decoration: BoxDecoration(
-        color: Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(15),
-      ),
+      decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(15)),
       child: TextField(
         controller: controller,
-        obscureText: isPassword,
+        obscureText: obscureText,
+        keyboardType: keyboardType,
         decoration: InputDecoration(
           hintText: label,
           prefixIcon: Icon(icon, color: Colors.orange),
+          suffixIcon: isPassword 
+            ? IconButton(icon: Icon(obscureText ? Icons.visibility_off : Icons.visibility), onPressed: toggleVisibility) 
+            : null,
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(vertical: 15),
         ),

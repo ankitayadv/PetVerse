@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart'; // ✅ ADD THIS
+import 'package:firebase_core/firebase_core.dart';
+
+// ✅ ADD THIS FILE (auto-generated)
 
 import 'screens/splash_screen.dart';
 import 'screens/onboarding_screen.dart';
@@ -7,9 +9,8 @@ import 'screens/login_screen.dart';
 import 'screens/signup_screen.dart';
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized(); // 
-  await Firebase.initializeApp(); // 
-
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
   runApp(const PetVerseApp());
 }
 
@@ -21,8 +22,8 @@ class PetVerseApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'PetVerse',
-      initialRoute: '/',
       theme: ThemeData(fontFamily: 'Poppins'),
+      initialRoute: '/',
       routes: {
         '/': (context) => const SplashScreen(),
         '/onboarding': (context) => const OnboardingScreen(),

@@ -112,7 +112,7 @@ class _RoutineTrackerPageState extends State<RoutineTrackerPage> {
                 Routine routine = entry.value;
                 return _routineItem(
                     routine, () => toggleDone(index));
-              }).toList(),
+              }),
 
               GestureDetector(
                 onTap: addRoutineDialog,
