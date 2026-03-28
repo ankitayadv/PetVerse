@@ -11,22 +11,28 @@ dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.8
+
+  # 🔥 Firebase
   firebase_core: ^2.24.2
   firebase_auth: ^4.17.0
   cloud_firestore: ^4.15.0
+
+  # ✅ ADD THIS (for date/time formatting)
+  intl: ^0.18.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
-  # 🔶 Added the dependency for generating app icons
+
+  # 🔶 App icon generator
   flutter_launcher_icons: ^0.13.1
 
 flutter_launcher_icons:
   android: true
   ios: true
   image_path: "assets/images/app_symbol.png"
-  adaptive_icon_background: "#0D0D0D"   # matches your dark theme
+  adaptive_icon_background: "#0D0D0D"
   adaptive_icon_foreground: "assets/images/app_symbol.png"
 
 flutter:
