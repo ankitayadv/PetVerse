@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../main.dart';
+import '../routes/app_routes.dart';
 
 class StepThreeScreen extends StatefulWidget {
   const StepThreeScreen({super.key});
