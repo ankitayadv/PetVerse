@@ -16,7 +16,7 @@ class MainNavigation extends StatefulWidget {
 class _MainNavigationState extends State<MainNavigation> {
   int currentIndex = 0;
 
-  final List<Widget> screens = const [
+  final List<Widget> screens =  [
     HomeScreen(),
     LostScreen(),
     HealthScreen(),
