@@ -16,14 +16,22 @@ class PetVerseApp extends StatelessWidget {
 
       theme: ThemeData(
         useMaterial3: true,
+
+        // ✅ GLOBAL FONT
         fontFamily: 'Poppins',
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.orange),
+
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.orange,
+        ),
+
+        // 🔥 OPTIONAL (makes UI cleaner)
+        scaffoldBackgroundColor: Colors.white,
       ),
 
       // 🔥 Start from Splash
       initialRoute: AppRoutes.splash,
 
-      // 🔥 All navigation handled here
+      // 🔥 Centralized navigation
       onGenerateRoute: AppRoutes.generateRoute,
     );
   }

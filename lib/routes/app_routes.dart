@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-// 🔥 Import all screens
+// 🔥 AUTH + ONBOARDING
 import '../screens/splash_screen.dart';
 import '../screens/onboarding_screen.dart';
 import '../screens/login_screen.dart';
@@ -11,26 +11,47 @@ import '../screens/step_three_screen.dart';
 import '../screens/step_four_screen.dart';
 import '../screens/step_five_screen.dart';
 
-// ✅ IMPORTANT: import MainNavigation (NOT HomeScreen)
+// 🔥 MAIN NAVIGATION
 import '../screens/main_navigation.dart';
 
+// 🔥 NEW FEATURE SCREENS
+import '../screens/emergency_screen.dart';
+import '../screens/nearby_lost_found_screen.dart';
+import '../screens/booking_screen.dart';
+import '../screens/routine_screen.dart';
+import '../screens/vaccine_screen.dart';
+import '../screens/pet_care_screen.dart';
+
 class AppRoutes {
-  // 🔥 Route names
+  // 🔥 AUTH FLOW
   static const String splash = '/splash';
   static const String onboarding = '/onboarding';
   static const String login = '/login';
   static const String signup = '/signup';
+
+  // 🔥 ONBOARDING STEPS
   static const String stepOne = '/stepone';
   static const String stepTwo = '/steptwo';
   static const String stepThree = '/stepthree';
   static const String stepFour = '/stepfour';
   static const String stepFive = '/stepfive';
+
+  // 🔥 MAIN APP
   static const String home = '/home';
 
-  // 🔥 Route generator
+  // 🔥 HOME FEATURE ROUTES
+  static const String emergency = '/emergency';
+  static const String lost = '/lost';
+  static const String booking = '/booking';
+  static const String routine = '/routine';
+  static const String petCare = '/petcare';
+  static const String vaccine = '/vaccine';
+
+  // 🔥 ROUTE GENERATOR
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
 
+      // 🔹 AUTH FLOW
       case splash:
         return MaterialPageRoute(builder: (_) => const SplashScreen());
 
@@ -43,6 +64,7 @@ class AppRoutes {
       case signup:
         return MaterialPageRoute(builder: (_) => const SignUpScreen());
 
+      // 🔹 ONBOARDING STEPS
       case stepOne:
         return MaterialPageRoute(builder: (_) => const StepOneScreen());
 
@@ -62,7 +84,7 @@ class AppRoutes {
           settings: RouteSettings(arguments: args),
         );
 
-      // ✅ FIXED: Home should open MainNavigation
+      // 🔹 MAIN APP ENTRY
       case home:
         final selectedPet = settings.arguments as Map<String, String>?;
         return MaterialPageRoute(
@@ -70,6 +92,39 @@ class AppRoutes {
           settings: RouteSettings(arguments: selectedPet),
         );
 
+      // 🔹 FEATURE SCREENS (REAL ONES 🔥)
+
+      case emergency:
+        return MaterialPageRoute(
+          builder: (_) => const EmergencyScreen(),
+        );
+
+      case lost:
+        return MaterialPageRoute(
+          builder: (_) => const NearbyLostFoundScreen(),
+        );
+
+      case booking:
+        return MaterialPageRoute(
+          builder: (_) => const BookingScreen(),
+        );
+
+      case routine:
+        return MaterialPageRoute(
+          builder: (_) => const RoutineScreen(),
+        );
+
+      case petCare:
+        return MaterialPageRoute(
+          builder: (_) => const PetCareScreen(),
+        );
+
+      case vaccine:
+        return MaterialPageRoute(
+          builder: (_) => const VaccineScreen(),
+        );
+
+      // ❌ DEFAULT
       default:
         return MaterialPageRoute(
           builder: (_) => const Scaffold(
