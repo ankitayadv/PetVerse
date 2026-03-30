@@ -15,6 +15,7 @@ dependencies:
   intl: ^0.20.2
   geolocator: ^14.0.2
   geocoding: ^4.0.0
+  table_calendar: ^3.1.0
 
   # 🔥 NEW ADDED
   url_launcher: ^6.1.11

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 
 class RoutineScreen extends StatefulWidget {
   const RoutineScreen({super.key});
@@ -183,7 +182,7 @@ class _RoutineScreenState extends State<RoutineScreen> {
             ),
             trailing: Switch(
               value: item['isOn'],
-              activeColor: Colors.orange,
+              activeThumbColor: Colors.orange,
               onChanged: (val) => setState(() => item['isOn'] = val),
             ),
           ),
