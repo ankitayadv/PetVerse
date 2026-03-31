@@ -146,18 +146,19 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
 
               ElevatedButton(
                 onPressed: _isLoading ? null : loginUser,
-                child: _isLoading 
-                  ? const SizedBox(
-                      height: 20, 
-                      width: 20, 
-                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
-                    ) 
-                  : const Text(
-                      "LOG IN", 
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)
-                    ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  minimumSize: const Size(double.infinity, 60),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                  elevation: 2,
+                ),
+                child: _isLoading
+                    ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : const Text(
+                        "LOG IN", 
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 1.1, fontFamily: 'Poppins')
+                      ),
               ),
-
               const SizedBox(height: 25),
               const Text("OR", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
               const SizedBox(height: 25),

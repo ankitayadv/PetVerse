@@ -1,166 +1,171 @@
 import 'package:flutter/material.dart';
-// Ensure you import your home screen file here
-// import 'package:petverse/screens/home_screen.dart'; 
 
-class HealthScreen extends StatelessWidget {
+class HealthScreen extends StatefulWidget {
   const HealthScreen({super.key});
 
-  // PetVerse Theme Constants
+  @override
+  State<HealthScreen> createState() => _HealthScreenState();
+}
+
+class _HealthScreenState extends State<HealthScreen> {
   static const Color brandOrange = Color(0xFFFF8A3D);
   static const Color softCream = Color(0xFFFEF9F5);
-  static const Color surfaceWhite = Colors.white;
   static const Color textMain = Color(0xFF2D2D2D);
-  static const Color softBorder = Color(0xFFFFEBD2);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: softCream,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        centerTitle: true,
-        // BACK BUTTON: Navigates specifically to Home Screen
-        leading: _buildCircleBtn(Icons.arrow_back_ios_new, () {
-          // Option 1: Using pushReplacement if HomeScreen is a widget
-          // Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const HomeScreen()));
-          
-          // Option 2: Using pop if you came from Home, or pushNamed if routes are set
-          Navigator.of(context).pop(); 
-        }),
-        title: const Text(
-          "Health",
-          style: TextStyle(color: textMain, fontWeight: FontWeight.bold, fontSize: 18),
-        ),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 10),
-            const Text(
-              "Smart Health Analysis",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textMain),
+      body: CustomScrollView(
+        physics: const BouncingScrollPhysics(),
+        slivers: [
+          // 1. Sleek Medical-Grade Header
+          SliverAppBar(
+            expandedHeight: 160,
+            pinned: true,
+            elevation: 0,
+            backgroundColor: brandOrange,
+            automaticallyImplyLeading: false,
+            flexibleSpace: FlexibleSpaceBar(
+              centerTitle: true,
+              title: const Text("Wellness Diagnostics", 
+                style: TextStyle(fontWeight: FontWeight.w800, color: Colors.white, fontSize: 18, letterSpacing: 0.5)),
+              background: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [brandOrange, Color(0xFFF27A2A)],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
+                ),
+              ),
             ),
-            const SizedBox(height: 15),
+          ),
 
-            // --- BEHAVIOR ANALYSIS CARD ---
-            _buildHealthCard(
-              title: "Behavior Check",
-              subtitle: "Answer a few questions about your pet's behavior.",
-              icon: Icons.assignment_outlined,
-              color: const Color(0xFFF3E5F5), // Soft Purple
-              iconColor: Colors.purple,
-              onTap: () {
-                // Future: Navigate to Behavior Question Screen
-              },
-            ),
-            const SizedBox(height: 16),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                const Text("Specialized Modules", 
+                  style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold, color: textMain)),
+                const SizedBox(height: 6),
+                const Text("Non-invasive screening tools for preventative care", 
+                  style: TextStyle(fontSize: 13, color: Colors.blueGrey, fontWeight: FontWeight.w400)),
+                const SizedBox(height: 24),
 
-            // --- IMAGE / SKIN ANALYSIS CARD ---
-            _buildHealthCard(
-              title: "Upload Image",
-              subtitle: "Upload a photo to detect possible skin issues.",
-              icon: Icons.camera_alt_outlined,
-              color: const Color(0xFFE3F2FD), // Soft Blue
-              iconColor: Colors.blue,
-              onTap: () {
-                // Future: Navigate to Camera/Gallery upload
-              },
-            ),
-            const SizedBox(height: 16),
+                // 2. Professional Diagnostic Cards
+                _buildDiagnosticCard(
+                  title: "Behavioral Assessment",
+                  desc: "Cognitive pattern analysis & habit tracking",
+                  icon: Icons.psychology_outlined,
+                  color: Colors.indigo,
+                  status: "Available",
+                  onTap: () { /* Navigate to Behavior */ }
+                ),
+                _buildDiagnosticCard(
+                  title: "Vocal Mood Analysis",
+                  desc: "Acoustic stress detection via sound frequency",
+                  icon: Icons.graphic_eq_rounded,
+                  color: Colors.teal,
+                  status: "Available",
+                  onTap: () { /* Navigate to Mood Analysis */ }
+                ),
+                _buildDiagnosticCard(
+                  title: "Dermatological Scan",
+                  desc: "Advanced visual screening for skin pathologies",
+                  icon: Icons.biotech_outlined,
+                  color: Colors.blueGrey,
+                  status: "Coming Soon",
+                  onTap: () {}
+                ),
 
-            // --- SOUND / STRESS ANALYSIS CARD ---
-            _buildHealthCard(
-              title: "Record Sound",
-              subtitle: "Record your pet's sound to analyze stress levels.",
-              icon: Icons.mic_none_outlined,
-              color: const Color(0xFFE8F5E9), // Soft Green
-              iconColor: Colors.green,
-              onTap: () {
-                // Future: Navigate to Voice Recorder
-              },
+                const SizedBox(height: 30),
+                
+                // 3. Clinical Disclaimer
+                Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.blueGrey.withOpacity(0.1)),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.verified_user_outlined, color: Colors.blueGrey.shade300, size: 20),
+                      const SizedBox(width: 14),
+                      const Expanded(
+                        child: Text(
+                          "Digital screenings are for informational purposes. Consult a licensed veterinarian for definitive clinical diagnoses.",
+                          style: TextStyle(fontSize: 11, color: Colors.blueGrey, height: 1.5),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ]),
             ),
-            
-            const SizedBox(height: 40),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  // Card Builder for the Health Modules
-  Widget _buildHealthCard({
+  Widget _buildDiagnosticCard({
     required String title,
-    required String subtitle,
+    required String desc,
     required IconData icon,
     required Color color,
-    required Color iconColor,
+    required String status,
     required VoidCallback onTap,
   }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(24),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: surfaceWhite,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: softBorder),
-          boxShadow: [
-            BoxShadow(
-              color: brandOrange.withOpacity(0.03),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            )
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(15),
-              ),
-              child: Icon(icon, color: iconColor, size: 28),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: textMain),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(color: Colors.grey, fontSize: 12, height: 1.4),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
-          ],
-        ),
-      ),
-    );
-  }
+    bool isAvailable = status == "Available";
 
-  // Circular Button Helper for AppBar
-  Widget _buildCircleBtn(IconData icon, VoidCallback tap) {
-    return IconButton(
-      onPressed: tap,
-      icon: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: const BoxDecoration(
-          color: Color(0xFFFFF3E9), 
-          shape: BoxShape.circle,
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: InkWell(
+        onTap: isAvailable ? onTap : null,
+        borderRadius: BorderRadius.circular(24),
+        child: Container(
+          padding: const EdgeInsets.all(22),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 15,
+                offset: const Offset(0, 8),
+              )
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Icon(icon, color: color, size: 26),
+              ),
+              const SizedBox(width: 18),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: textMain)),
+                    const SizedBox(height: 4),
+                    Text(desc, style: const TextStyle(color: Colors.blueGrey, fontSize: 12, height: 1.3)),
+                  ],
+                ),
+              ),
+              isAvailable 
+                ? Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400)
+                : Text(status.toUpperCase(), style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: Colors.grey.shade400, letterSpacing: 1)),
+            ],
+          ),
         ),
-        child: Icon(icon, color: brandOrange, size: 18),
       ),
     );
   }

@@ -7,7 +7,7 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProviderStateMixin {
   // PetVerse Design System
   static const Color brandOrange = Color(0xFFFF8A3D);
   static const Color softCream = Color(0xFFFEF9F5);
@@ -18,6 +18,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final List<bool> weeklyStreak = [true, true, true, true, true, false, false];
   final List<String> days = ["M", "T", "W", "T", "F", "S", "S"];
 
+  bool _isAnimated = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Smooth entrance delay for animations
+    Future.delayed(const Duration(milliseconds: 150), () {
+      if (mounted) setState(() => _isAnimated = true);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -26,15 +37,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
-        leading: _buildCircleBtn(Icons.arrow_back_ios_new, () => Navigator.pop(context)),
-        title: const Text("Profile", 
-          style: TextStyle(color: textMain, fontWeight: FontWeight.bold, fontSize: 18)),
+        automaticallyImplyLeading: false, 
+        title: const Text(
+          "My Profile", 
+          style: TextStyle(color: textMain, fontWeight: FontWeight.bold, fontSize: 20)
+        ),
         actions: [
-          _buildCircleBtn(Icons.share_outlined, () {}),
+          _buildCircleBtn(Icons.settings_outlined, () {}),
           const SizedBox(width: 16),
         ],
       ),
       body: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.symmetric(horizontal: 20),
         child: Column(
           children: [
@@ -42,20 +56,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _buildProfileHeader(),
             const SizedBox(height: 25),
             
-            _buildStreakCard(),
+            // Streak Card with Slide-up Animation
+            AnimatedPadding(
+              duration: const Duration(milliseconds: 600),
+              padding: EdgeInsets.only(top: _isAnimated ? 0 : 20),
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 600),
+                opacity: _isAnimated ? 1 : 0,
+                child: _buildStreakCard(),
+              ),
+            ),
+            
             const SizedBox(height: 25),
 
-            // --- PET PROFILE SECTION (Name, Weight, Gender, Age) ---
             _buildSectionLabel("Pet Profile"),
             _buildDetailedPetCard(), 
+            
             const SizedBox(height: 25),
 
-            // --- ACCOUNT SETTINGS ---
-            _buildSectionLabel("Settings"),
-            _buildActionTile("Edit Owner Profile", Icons.edit_outlined, () {}),
-            _buildActionTile("Notification Settings", Icons.notifications_none_outlined, () {}),
-            _buildActionTile("Privacy & Settings", Icons.shield_outlined, () {}),
-            _buildActionTile("Logout", Icons.logout_rounded, _showLogoutDialog, isDestructive: true),
+            _buildSectionLabel("Account & Security"),
+            _buildSettingsGroup(),
             
             const SizedBox(height: 40),
           ],
@@ -63,6 +83,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
+
+  // --- UI COMPONENTS ---
 
   Widget _buildProfileHeader() {
     return Column(
@@ -74,57 +96,86 @@ class _ProfileScreenState extends State<ProfileScreen> {
               padding: const EdgeInsets.all(4),
               decoration: const BoxDecoration(color: brandOrange, shape: BoxShape.circle),
               child: const CircleAvatar(
-                radius: 50,
+                radius: 55,
                 backgroundColor: Colors.white,
-                child: Icon(Icons.person, size: 50, color: Color(0xFFCBD5E1)),
+                backgroundImage: NetworkImage('https://api.dicebear.com/7.x/avataaars/png?seed=Ankita'),
               ),
             ),
             Container(
-              padding: const EdgeInsets.all(6),
+              padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: brandOrange, 
                 shape: BoxShape.circle, 
-                border: Border.all(color: Colors.white, width: 2)
+                border: Border.all(color: Colors.white, width: 3)
               ),
-              child: const Icon(Icons.camera_alt, size: 14, color: Colors.white),
+              child: const Icon(Icons.camera_alt_rounded, size: 16, color: Colors.white),
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
         const Text("Ankita Mehta", 
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: textMain)),
-        const Text("Professional Pet Parent", style: TextStyle(color: Colors.grey, fontSize: 14)),
+          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: textMain)),
+        const SizedBox(height: 6),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          decoration: BoxDecoration(
+            color: brandOrange.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(20)
+          ),
+          child: const Text("Premium Pet Parent 🐾", 
+            style: TextStyle(color: brandOrange, fontSize: 12, fontWeight: FontWeight.bold)),
+        ),
       ],
     );
   }
 
   Widget _buildStreakCard() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: brandOrange,
-        borderRadius: BorderRadius.circular(28),
+        gradient: const LinearGradient(
+          colors: [brandOrange, Color(0xFFFFAC71)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(32),
+        boxShadow: [
+          BoxShadow(
+            color: brandOrange.withOpacity(0.3),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          )
+        ],
       ),
       child: Column(
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: const [
-              Text("Care Streak 🔥", 
-                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-              Text("05 Days", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Text("Activity Streak", style: TextStyle(color: Colors.white70, fontSize: 14)),
+                  Text("05 Days 🔥", style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                ],
+              ),
+              const Icon(Icons.auto_graph_rounded, color: Colors.white, size: 30),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 25),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: List.generate(7, (index) {
               bool isDone = weeklyStreak[index];
               return Column(
                 children: [
-                  Text(days[index], style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                  Text(days[index], style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
-                  Icon(isDone ? Icons.check_circle : Icons.circle_outlined, color: Colors.white, size: 22),
+                  AnimatedScale(
+                    scale: _isAnimated ? 1 : 0.5,
+                    duration: Duration(milliseconds: 400 + (index * 100)),
+                    child: Icon(isDone ? Icons.check_circle : Icons.circle_outlined, color: Colors.white, size: 22),
+                  ),
                 ],
               );
             }),
@@ -139,60 +190,74 @@ class _ProfileScreenState extends State<ProfileScreen> {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: surfaceWhite,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(28),
         border: Border.all(color: softBorder),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 15, offset: const Offset(0, 5))],
       ),
       child: Column(
         children: [
           Row(
             children: [
               Container(
-                height: 60, width: 60,
+                height: 65, width: 65,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(15),
-                  color: const Color(0xFFFFF3E9),
+                  borderRadius: BorderRadius.circular(20),
+                  image: const DecorationImage(
+                    image: NetworkImage('https://images.unsplash.com/photo-1583511655857-d19b40a7a54e?q=80&w=200&auto=format&fit=crop'),
+                    fit: BoxFit.cover
+                  ),
                 ),
-                child: const Icon(Icons.pets, color: brandOrange, size: 30),
               ),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text("Bruno", 
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: textMain)),
+                    const Text("Bruno", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: textMain)),
                     const SizedBox(height: 4),
                     Row(
                       children: const [
-                        Icon(Icons.verified, color: Colors.green, size: 14),
+                        Icon(Icons.verified_user_rounded, color: Colors.green, size: 16),
                         SizedBox(width: 4),
-                        Text("Vaccines Up-to-date", 
-                          style: TextStyle(color: Colors.green, fontSize: 12, fontWeight: FontWeight.w600)),
+                        Text("Fully Vaccinated", style: TextStyle(color: Colors.green, fontSize: 13, fontWeight: FontWeight.w600)),
                       ],
                     ),
                   ],
                 ),
               ),
-              // EDIT PET PROFILE BUTTON
-              IconButton(
-                onPressed: () {
-                   // Navigate to your existing StepThreeScreen or an Edit Pet page
-                },
-                icon: const Icon(Icons.edit_note_rounded, color: brandOrange, size: 28),
+              _buildCircleBtn(Icons.edit_note_rounded, () {}),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: const [
+                  Text("Health Progress", style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  Text("85%", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: brandOrange)),
+                ],
+              ),
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: const LinearProgressIndicator(
+                  value: 0.85,
+                  backgroundColor: softBorder,
+                  color: brandOrange,
+                  minHeight: 8,
+                ),
               ),
             ],
           ),
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 15),
-            child: Divider(color: softBorder, thickness: 1),
-          ),
-          // PET DESCRIPTION (GENDER, WEIGHT, AGE)
+          const SizedBox(height: 20),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildPetStat("Gender", "Male"),
-              _buildPetStat("Weight", "25 kg"),
-              _buildPetStat("Age", "3 Yrs"),
+              _buildPetStat("Gender", "Male", Icons.male_rounded),
+              _buildPetStat("Weight", "25 kg", Icons.fitness_center_rounded),
+              _buildPetStat("Age", "3 Yrs", Icons.cake_rounded),
             ],
           ),
         ],
@@ -200,24 +265,50 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildPetStat(String label, String value) {
+  Widget _buildPetStat(String label, String value, IconData icon) {
     return Column(
       children: [
-        Text(value, 
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: textMain)),
-        const SizedBox(height: 4),
-        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+        Icon(icon, color: brandOrange.withOpacity(0.5), size: 18),
+        const SizedBox(height: 6),
+        Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: textMain)),
+        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 11)),
       ],
+    );
+  }
+
+  Widget _buildSettingsGroup() {
+    return Container(
+      decoration: BoxDecoration(
+        color: surfaceWhite,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: softBorder),
+      ),
+      child: Column(
+        children: [
+          _buildActionTile("Edit Owner Profile", Icons.person_outline_rounded, () {}),
+          _buildActionTile("Edit Pet Profile", Icons.pets_rounded, () {}),
+          _buildActionTile("Privacy & Security", Icons.security_rounded, () {}),
+          _buildActionTile("Reminders & Alerts", Icons.notifications_active_rounded, () {}),
+          _buildActionTile("Sign Out", Icons.logout_rounded, _showLogoutDialog, isDestructive: true),
+        ],
+      ),
     );
   }
 
   Widget _buildActionTile(String title, IconData icon, VoidCallback tap, {bool isDestructive = false}) {
     return ListTile(
       onTap: tap,
-      leading: Icon(icon, color: isDestructive ? Colors.red : brandOrange),
-      title: Text(title, 
-        style: TextStyle(color: isDestructive ? Colors.red : textMain, fontWeight: FontWeight.w500)),
-      trailing: const Icon(Icons.chevron_right, size: 18, color: Colors.grey),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: isDestructive ? Colors.red.withOpacity(0.1) : brandOrange.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12)
+        ),
+        child: Icon(icon, color: isDestructive ? Colors.red : brandOrange, size: 20),
+      ),
+      title: Text(title, style: TextStyle(color: isDestructive ? Colors.red : textMain, fontWeight: FontWeight.w600, fontSize: 15)),
+      trailing: const Icon(Icons.chevron_right_rounded, size: 18, color: Colors.grey),
     );
   }
 
@@ -226,7 +317,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       onPressed: tap, 
       icon: Container(
         padding: const EdgeInsets.all(8), 
-        decoration: const BoxDecoration(color: Color(0xFFFFF3E9), shape: BoxShape.circle), 
+        decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle), 
         child: Icon(icon, color: brandOrange, size: 18)
       )
     );
@@ -234,8 +325,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildSectionLabel(String title) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12, top: 10, left: 5), 
-      child: Row(children: [Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold))])
+      padding: const EdgeInsets.only(bottom: 16, top: 10, left: 4), 
+      child: Row(children: [Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textMain))])
     );
   }
 
@@ -243,15 +334,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text("Logout"),
-        content: const Text("Are you sure you want to log out?"),
+        backgroundColor: surfaceWhite,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        title: const Text("Logout", style: TextStyle(fontWeight: FontWeight.bold)),
+        content: const Text("Ready to leave PetVerse for a while?"),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, shape: const StadiumBorder()),
-            onPressed: () => Navigator.of(context).popUntil((route) => route.isFirst),
-            child: const Text("Logout", style: TextStyle(color: Colors.white)),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Stay", style: TextStyle(color: Colors.grey))),
+          Padding(
+            padding: const EdgeInsets.only(right: 8, bottom: 8),
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, elevation: 0, shape: const StadiumBorder()),
+              onPressed: () => Navigator.of(context).popUntil((route) => route.isFirst),
+              child: const Text("Logout", style: TextStyle(color: Colors.white)),
+            ),
           ),
         ],
       ),
