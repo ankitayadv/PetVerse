@@ -20,6 +20,11 @@ dependencies:
   # 🔥 NEW ADDED
   url_launcher: ^6.1.11
   scrollable_positioned_list: ^0.3.8
+  image_picker: ^1.2.1
+  country_picker: ^2.0.27
+  country_state_city: ^0.1.6
+  country_state_city_picker: ^1.2.8
+  http: ^1.6.0
 
 dev_dependencies:
   flutter_test:
