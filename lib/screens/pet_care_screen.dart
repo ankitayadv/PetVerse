@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../routes/app_routes.dart'; // ✅ IMPORTANT
 
 class PetCareScreen extends StatelessWidget {
   const PetCareScreen({super.key});
@@ -62,17 +63,21 @@ class PetCareScreen extends StatelessWidget {
                 _buildCategoryCard(
                   context,
                   title: 'Training',
-                  icon: Icons.pets, // ✅ dog paw
+                  icon: Icons.pets,
                   color: const Color(0xFFFFEBDD),
-                  onTap: () => _showSnack(context, "Training clicked"),
+                  onTap: () {
+                    Navigator.pushNamed(context, AppRoutes.training);
+                  },
                 ),
                 const SizedBox(width: 15),
                 _buildCategoryCard(
                   context,
                   title: 'Feeding',
-                  icon: Icons.restaurant, // ✅ food bowl type
+                  icon: Icons.restaurant,
                   color: const Color(0xFFDFF6FF),
-                  onTap: () => _showSnack(context, "Feeding clicked"),
+                  onTap: () {
+                    Navigator.pushNamed(context, AppRoutes.feeding);
+                  },
                 ),
               ],
             ),
@@ -84,7 +89,7 @@ class PetCareScreen extends StatelessWidget {
                 _buildCategoryCard(
                   context,
                   title: 'Grooming',
-                  icon: Icons.cleaning_services, // ✅ grooming
+                  icon: Icons.cleaning_services,
                   color: const Color(0xFFFBEFFF),
                   onTap: () => _showSnack(context, "Grooming clicked"),
                 ),
@@ -92,7 +97,7 @@ class PetCareScreen extends StatelessWidget {
                 _buildCategoryCard(
                   context,
                   title: 'Walking',
-                  icon: Icons.directions_walk, // ✅ walking (NO sun)
+                  icon: Icons.directions_walk,
                   color: const Color(0xFFE5FFED),
                   onTap: () => _showSnack(context, "Walking clicked"),
                 ),
@@ -111,25 +116,29 @@ class PetCareScreen extends StatelessWidget {
             _buildArticleTile(
               context,
               title: 'How to Train Your Dog',
-              subtitle: 'Your 14 daily training tips',
+              subtitle: 'Your daily training tips',
               imageUrl:
                   'https://images.unsplash.com/photo-1583511655857-d19b40a7a54e',
-              onTap: () => _showSnack(context, "Open Training Article"),
+              onTap: () {
+                Navigator.pushNamed(context, AppRoutes.trainingArticle);
+              },
             ),
 
             _buildArticleTile(
               context,
               title: 'Best Foods for Pets',
-              subtitle: 'Ensuring good joints',
+              subtitle: 'Ensure good nutrition',
               imageUrl:
                   'https://images.unsplash.com/photo-1601758228041-f3b2795255f1',
-              onTap: () => _showSnack(context, "Open Food Article"),
+              onTap: () {
+                Navigator.pushNamed(context, AppRoutes.bestFood);
+              },
             ),
 
             _buildArticleTile(
               context,
               title: 'Daily Grooming Tips',
-              subtitle: 'Starts from the head',
+              subtitle: 'Keep your pet healthy',
               imageUrl:
                   'https://images.unsplash.com/photo-1518717758536-85ae29035b6d',
               onTap: () => _showSnack(context, "Open Grooming Article"),
@@ -252,9 +261,6 @@ class PetCareScreen extends StatelessWidget {
                 width: 55,
                 height: 55,
                 fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) =>
-                    const Icon(Icons.pets,
-                        size: 40, color: Colors.grey),
               ),
             ),
             const SizedBox(width: 15),
@@ -286,10 +292,3 @@ class PetCareScreen extends StatelessWidget {
     );
   }
 }
-
-
-
-
-
-
-

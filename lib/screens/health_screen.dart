@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../routes/app_routes.dart'; // ✅ IMPORTANT
 
 class HealthScreen extends StatefulWidget {
   const HealthScreen({super.key});
@@ -19,7 +20,7 @@ class _HealthScreenState extends State<HealthScreen> {
       body: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
-          // 1. Sleek Medical-Grade Header
+          // HEADER
           SliverAppBar(
             expandedHeight: 160,
             pinned: true,
@@ -28,8 +29,14 @@ class _HealthScreenState extends State<HealthScreen> {
             automaticallyImplyLeading: false,
             flexibleSpace: FlexibleSpaceBar(
               centerTitle: true,
-              title: const Text("Wellness Diagnostics", 
-                style: TextStyle(fontWeight: FontWeight.w800, color: Colors.white, fontSize: 18, letterSpacing: 0.5)),
+              title: const Text(
+                "Wellness Diagnostics",
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                  fontSize: 18,
+                ),
+              ),
               background: Container(
                 decoration: const BoxDecoration(
                   gradient: LinearGradient(
@@ -46,58 +53,80 @@ class _HealthScreenState extends State<HealthScreen> {
             padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
-                const Text("Specialized Modules", 
-                  style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold, color: textMain)),
+                const Text(
+                  "Specialized Modules",
+                  style: TextStyle(
+                      fontSize: 19,
+                      fontWeight: FontWeight.bold,
+                      color: textMain),
+                ),
                 const SizedBox(height: 6),
-                const Text("Non-invasive screening tools for preventative care", 
-                  style: TextStyle(fontSize: 13, color: Colors.blueGrey, fontWeight: FontWeight.w400)),
+                const Text(
+                  "Non-invasive screening tools for preventative care",
+                  style: TextStyle(fontSize: 13, color: Colors.blueGrey),
+                ),
                 const SizedBox(height: 24),
 
-                // 2. Professional Diagnostic Cards
+                // 🔥 BEHAVIOR
                 _buildDiagnosticCard(
                   title: "Behavioral Assessment",
                   desc: "Cognitive pattern analysis & habit tracking",
                   icon: Icons.psychology_outlined,
                   color: Colors.indigo,
                   status: "Available",
-                  onTap: () { /* Navigate to Behavior */ }
+                  onTap: () {
+                    Navigator.pushNamed(context, AppRoutes.behavior);
+                  },
                 ),
+
+                // 🔥 VOCAL
                 _buildDiagnosticCard(
                   title: "Vocal Mood Analysis",
                   desc: "Acoustic stress detection via sound frequency",
                   icon: Icons.graphic_eq_rounded,
                   color: Colors.teal,
                   status: "Available",
-                  onTap: () { /* Navigate to Mood Analysis */ }
+                  onTap: () {
+                    Navigator.pushNamed(context, AppRoutes.vocal);
+                  },
                 ),
+
+                // 🔥 SKIN
                 _buildDiagnosticCard(
                   title: "Dermatological Scan",
                   desc: "Advanced visual screening for skin pathologies",
                   icon: Icons.biotech_outlined,
                   color: Colors.blueGrey,
-                  status: "Coming Soon",
-                  onTap: () {}
+                  status: "Available",
+                  onTap: () {
+                    Navigator.pushNamed(context, AppRoutes.skin);
+                  },
                 ),
 
                 const SizedBox(height: 30),
-                
-                // 3. Clinical Disclaimer
+
+                // DISCLAIMER
                 Container(
                   padding: const EdgeInsets.all(18),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.blueGrey.withOpacity(0.1)),
+                    border:
+                        Border.all(color: Colors.blueGrey.withOpacity(0.1)),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.verified_user_outlined, color: Colors.blueGrey.shade300, size: 20),
+                      Icon(Icons.verified_user_outlined,
+                          color: Colors.blueGrey.shade300, size: 20),
                       const SizedBox(width: 14),
                       const Expanded(
                         child: Text(
-                          "Digital screenings are for informational purposes. Consult a licensed veterinarian for definitive clinical diagnoses.",
-                          style: TextStyle(fontSize: 11, color: Colors.blueGrey, height: 1.5),
+                          "Digital screenings are for informational purposes. Consult a veterinarian for diagnosis.",
+                          style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.blueGrey,
+                              height: 1.5),
                         ),
                       ),
                     ],
@@ -154,15 +183,19 @@ class _HealthScreenState extends State<HealthScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: textMain)),
+                    Text(title,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 16)),
                     const SizedBox(height: 4),
-                    Text(desc, style: const TextStyle(color: Colors.blueGrey, fontSize: 12, height: 1.3)),
+                    Text(desc,
+                        style: const TextStyle(
+                            color: Colors.blueGrey, fontSize: 12)),
                   ],
                 ),
               ),
-              isAvailable 
-                ? Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400)
-                : Text(status.toUpperCase(), style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: Colors.grey.shade400, letterSpacing: 1)),
+              const Icon(Icons.chevron_right_rounded,
+                  color: Colors.grey),
             ],
           ),
         ),
