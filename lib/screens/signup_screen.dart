@@ -29,19 +29,23 @@ class _SignUpScreenState extends State<SignUpScreen> with SingleTickerProviderSt
     );
   }
 
-  // ✅ FORM VALIDATION
+  // ✅ ENHANCED FORM VALIDATION
   String? _validateForm() {
     final name = nameController.text.trim();
     final email = emailController.text.trim();
     final password = passwordController.text.trim();
 
+    if (name.isEmpty) return "Name cannot be empty.";
     if (name.length < 3) return "Please enter your full name.";
     
     final emailRegex = RegExp(r"^[a-zA-Z0-9.a-zA-Z0-9.!#$%&'*+-/=?^_`{|}~]+@[a-zA-Z0-9]+\.[a-zA-Z]+");
     if (!emailRegex.hasMatch(email)) return "Enter a valid email address.";
 
+    // Strong Password Requirements
     if (password.length < 8) return "Password must be at least 8 characters.";
-    if (!RegExp(r'[A-Z]').hasMatch(password)) return "Include at least one uppercase letter.";
+    if (!RegExp(r'[A-Z]').hasMatch(password)) return "Add at least one uppercase letter.";
+    if (!RegExp(r'[a-z]').hasMatch(password)) return "Add at least one lowercase letter.";
+    if (!RegExp(r'[0-9]').hasMatch(password)) return "Add at least one number.";
     
     return null;
   }
@@ -64,7 +68,7 @@ class _SignUpScreenState extends State<SignUpScreen> with SingleTickerProviderSt
       setState(() => _isLoading = false);
       _showSnackBar("Account created successfully!", Colors.green);
       
-      // ✅ SUCCESS FLOW: New users go to Step One for pet setup
+      // SUCCESS FLOW: New users go to Step One for pet setup
       Navigator.pushNamedAndRemoveUntil(context, '/stepone', (route) => false);
     }
   }
@@ -180,14 +184,8 @@ class _SignUpScreenState extends State<SignUpScreen> with SingleTickerProviderSt
                 textColor: Colors.black87,
                 onTap: () => _showSnackBar("Google Registration Selected", Colors.blue),
               ),
-              const SizedBox(height: 12),
-              _socialButton(
-                label: "Sign up with Apple",
-                iconAsset: Icons.apple,
-                color: Colors.black,
-                textColor: Colors.white,
-                onTap: () => _showSnackBar("Apple Registration Selected", Colors.black),
-              ),
+              
+              // Apple Sign-in Removed
 
               const SizedBox(height: 35),
               Row(

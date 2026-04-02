@@ -165,7 +165,7 @@ class _VetScreenState extends State<VetScreen> {
                 child: Center(child: Text("No vets found in this category", style: TextStyle(color: Colors.grey))),
               )
             else
-              ...filteredVets.map((vet) => _buildVetCard(vet)).toList(),
+              ...filteredVets.map((vet) => _buildVetCard(vet)),
             
             const SizedBox(height: 20),
           ],

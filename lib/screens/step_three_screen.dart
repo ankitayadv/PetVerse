@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
-import '../routes/app_routes.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:io';
+import 'step_four_screen.dart';
+import 'step_five_screen.dart';
 
 class StepThreeScreen extends StatefulWidget {
   const StepThreeScreen({super.key});
@@ -9,190 +12,235 @@ class StepThreeScreen extends StatefulWidget {
 }
 
 class _StepThreeScreenState extends State<StepThreeScreen> {
-
-  List<Map<String, String>> addedPets = [];
-
-  // ✅ FIXED NAVIGATION (SAFE TYPE)
-  Future<void> _navigateAndAddPet() async {
-    final result = await Navigator.pushNamed(context, AppRoutes.stepFour);
-
-    if (result != null && result is Map) {
-      setState(() {
-        addedPets.add(Map<String, String>.from(result));
-      });
-    }
-  }
+  final List<Map<String, dynamic>> _petFamily = [];
+  int maxDogs = 0;
+  int maxCats = 0;
+  bool _initialized = false;
+  
+  // This holds the combined data (Owner info + Pets)
+  Map<String, dynamic> _allData = {};
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
+    if (!_initialized) {
+      final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+      _allData = args ?? {}; 
 
+      // Force conversion to int to avoid the "String is not a subtype of int" error
+      maxDogs = int.tryParse(_allData['maxDogs']?.toString() ?? '0') ?? 0;
+      maxCats = int.tryParse(_allData['maxCats']?.toString() ?? '0') ?? 0;
+
+      _initialized = true;
+    }
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF9F9F9),
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, color: Colors.orange, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          "Step 3 of 5",
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 16),
-        ),
+        title: const Text("Step 3 of 5", style: TextStyle(color: Colors.grey, fontSize: 14, letterSpacing: 1.1)),
         centerTitle: true,
-        backgroundColor: Colors.white,
+        backgroundColor: Colors.transparent,
         elevation: 0,
       ),
+      body: Column(
+        children: [
+          const SizedBox(height: 10),
+          const Text(
+            "Your Pet Family", 
+            style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, fontFamily: 'Poppins', color: Color(0xFF2D2D2D))
+          ),
+          Text(
+            "Added ${_petFamily.length} ${_petFamily.length == 1 ? 'Pet' : 'Pets'} " 
+            "(${_countByType('Dog')} Dogs, ${_countByType('Cat')} Cats)",
+            style: const TextStyle(color: Colors.orange, fontWeight: FontWeight.w600, fontSize: 13),
+          ),
+          const SizedBox(height: 24),
+          
+          _buildPremiumCard(),
+          
+          Expanded(
+            child: _petFamily.isEmpty 
+              ? _buildEmptyState() 
+              : ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                  itemCount: _petFamily.length,
+                  itemBuilder: (context, index) => _buildPetCard(_petFamily[index], index),
+                ),
+          ),
 
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          _buildProfessionalBottomActions(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPremiumCard() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 24),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0F8F7),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.teal.withOpacity(0.1)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.auto_awesome, color: Colors.orange, size: 20),
+              SizedBox(width: 8),
+              Text("PetVerse Premium Perks", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _premiumItem(Icons.favorite_border, "Real-time health tracking"),
+          _premiumItem(Icons.location_on_outlined, "Lost & Found network access"),
+          _premiumItem(Icons.menu_book_outlined, "Pet care guides"),
+          _premiumItem(Icons.medical_services_outlined, "Emergency support"),
+          _premiumItem(Icons.analytics_outlined, "Wellness diagnostics"),
+        ],
+      ),
+    );
+  }
+
+  Widget _premiumItem(IconData icon, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: Colors.teal.shade700),
+          const SizedBox(width: 12),
+          Text(text, style: TextStyle(color: Colors.teal.shade900, fontSize: 13, fontWeight: FontWeight.w500)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPetCard(Map<String, dynamic> pet, int index) {
+    return GestureDetector(
+      onTap: () => _navigateToAddPet(isEditing: true, index: index),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(22),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 15, offset: const Offset(0, 4))],
+        ),
+        child: Row(
           children: [
-
-            const SizedBox(height: 10),
-
-            const Text(
-              "Let's Add Your Pets!",
-              style: TextStyle(
-                fontSize: 26,
-                fontWeight: FontWeight.w900,
-                color: Color(0xFF2D2D2D),
-              ),
-            ),
-
-            const SizedBox(height: 8),
-
-            const Text(
-              "Add details for each pet individually.",
-              style: TextStyle(color: Colors.grey, fontSize: 15),
-            ),
-
-            const SizedBox(height: 25),
-
-            _buildBenefitCard(),
-
-            const SizedBox(height: 25),
-
-            // ✅ EMPTY STATE IMPROVED
-            if (addedPets.isEmpty)
-              Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 60),
-                  child: Column(
+            _buildAvatar(pet['image']),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
-                      Icon(Icons.pets_outlined,
-                          size: 60, color: Colors.grey.withOpacity(0.3)),
-                      const SizedBox(height: 10),
-                      const Text(
-                        "No pets added yet",
-                        style: TextStyle(color: Colors.grey),
-                      ),
+                      Text(pet['name'] ?? "Unnamed", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.check_circle_rounded, color: Colors.blue, size: 16),
                     ],
                   ),
-                ),
-              )
-            else
-              ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: addedPets.length,
-                itemBuilder: (context, index) {
-                  final pet = addedPets[index];
-
-                  return _buildPetItem(
-                    pet['name'] ?? 'Buddy',
-                    "${pet['breed']} • ${pet['age']} • ${pet['gender']}",
-                  );
-                },
-              ),
-
-            const SizedBox(height: 25),
-
-            // ✅ BUTTON IMPROVED
-            SizedBox(
-              width: double.infinity,
-              height: 60,
-              child: ElevatedButton(
-                onPressed: _navigateAndAddPet,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18)),
-                  elevation: 0,
-                ),
-                child: Text(
-                  addedPets.isEmpty ? "Add First Pet" : "Add Another Pet",
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold),
-                ),
+                  Text("${pet['type']} • ${pet['breed']} • ${pet['gender']}", style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
+                  if (pet['features'] != null && pet['features'].toString().isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4.0),
+                      child: Text("Note: ${pet['features']}", style: const TextStyle(color: Colors.orange, fontSize: 11, fontWeight: FontWeight.w600)),
+                    ),
+                ],
               ),
             ),
-
-            const SizedBox(height: 10),
-
-            TextButton(
-              onPressed: () =>
-                  Navigator.pushNamed(context, AppRoutes.stepFive),
-              child: Text(
-                addedPets.isEmpty ? "Skip for Now" : "Confirm & Continue",
-                style: TextStyle(
-                  color: addedPets.isEmpty ? Colors.grey : Colors.orange,
-                  fontWeight: FontWeight.bold,
+            Column(
+              children: [
+                Icon(Icons.edit_note_rounded, color: Colors.grey.shade300),
+                const SizedBox(height: 8),
+                IconButton(
+                  icon: Icon(Icons.delete_sweep_outlined, color: Colors.red.shade300),
+                  onPressed: () => setState(() => _petFamily.removeAt(index)),
                 ),
-              ),
+              ],
             ),
-
-            const SizedBox(height: 20),
           ],
         ),
       ),
     );
   }
 
-  // ✅ CLEAN BENEFIT CARD
-  Widget _buildBenefitCard() {
+  Widget _buildAvatar(dynamic image) {
     return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF4FBF9),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildBenefitRow(Icons.lightbulb_outline,
-              "Adding each pet helps us provide:"),
-          const SizedBox(height: 15),
-          _buildBenefitRow(Icons.campaign_outlined, "Lost pet alerts",
-              isSubItem: true),
-          _buildBenefitRow(Icons.auto_awesome_outlined,
-              "Smart recommendations",
-              isSubItem: true),
-          _buildBenefitRow(Icons.favorite_border, "Health reminders",
-              isSubItem: true),
-        ],
+      width: 64, height: 64,
+      decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), color: Colors.orange.shade50),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: image != null
+            ? (kIsWeb ? Image.network(image.path, fit: BoxFit.cover) : Image.file(File(image.path), fit: BoxFit.cover))
+            : const Icon(Icons.pets, color: Colors.orange, size: 28),
       ),
     );
   }
 
-  Widget _buildBenefitRow(IconData icon, String text,
-      {bool isSubItem = false}) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: isSubItem ? 8.0 : 0),
-      child: Row(
+  Widget _buildProfessionalBottomActions() {
+    bool hasPets = _petFamily.isNotEmpty;
+    int totalLimit = maxDogs + maxCats;
+    bool isFullyComplete = _petFamily.length >= totalLimit && totalLimit > 0;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 34),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 20, offset: const Offset(0, -8))],
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon,
-              color: isSubItem ? Colors.teal : Colors.orange,
-              size: isSubItem ? 18 : 22),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              text,
-              style: TextStyle(
-                fontSize: isSubItem ? 13 : 14,
-                fontWeight:
-                    isSubItem ? FontWeight.w500 : FontWeight.bold,
+          SizedBox(
+            width: double.infinity,
+            height: 58,
+            child: ElevatedButton.icon(
+              onPressed: isFullyComplete 
+                ? () => _showSnackBar("Family goal reached! You can proceed now.") 
+                : () => _navigateToAddPet(),
+              icon: Icon(isFullyComplete ? Icons.task_alt : Icons.add_rounded, color: Colors.white),
+              label: Text(
+                isFullyComplete ? "Family Goals Met" : "Add Another Pet", 
+                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.white)
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: isFullyComplete ? Colors.teal : Colors.orange,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                elevation: 0,
+              ),
+            ),
+          ),
+          if (hasPets) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 58,
+              child: OutlinedButton(
+                onPressed: _showProfessionalDialog,
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Colors.orange, width: 1.5),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                ),
+                child: const Text("Confirm & Proceed", style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.orange)),
+              ),
+            ),
+          ],
+          const SizedBox(height: 10),
+          GestureDetector(
+            onTap: () => _navigateToStepFive(),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              child: Text(
+                "Skip for now", 
+                style: TextStyle(color: Colors.grey.shade500, fontSize: 14, fontWeight: FontWeight.w500)
               ),
             ),
           ),
@@ -201,76 +249,127 @@ class _StepThreeScreenState extends State<StepThreeScreen> {
     );
   }
 
-  // ✅ BEAUTIFUL PET CARD (LIKE YOUR DESIGN)
-  Widget _buildPetItem(String name, String details) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFF2F2F2)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+  void _showSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message, style: const TextStyle(fontFamily: 'Poppins')),
+        backgroundColor: Colors.teal,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(20),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
-      child: Row(
+    );
+  }
+
+  void _showProfessionalDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(color: Colors.orange.withOpacity(0.1), shape: BoxShape.circle),
+                child: const Icon(Icons.pets_rounded, color: Colors.orange, size: 32),
+              ),
+              const SizedBox(height: 20),
+              const Text("Are you sure?", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
+              const Text(
+                "Great! You've added your furry friends to the PetVerse family. Ready to finalize their profiles?",
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 14, color: Colors.grey, height: 1.5),
+              ),
+              const SizedBox(height: 32),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: Text("Go Back", style: TextStyle(color: Colors.grey.shade500, fontWeight: FontWeight.w700)),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _navigateToStepFive();
+                      },
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, elevation: 0),
+                      child: const Text("Continue", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  int _countByType(String type) => _petFamily.where((p) => p['type'] == type).length;
+
+  Future<void> _navigateToAddPet({bool isEditing = false, int? index}) async {
+    final result = await Navigator.push(
+      context, 
+      MaterialPageRoute(
+        builder: (context) => StepFourScreen(
+          isEditing: isEditing, 
+          existingPet: isEditing ? _petFamily[index!] : null, 
+          currentDogCount: _countByType('Dog'), 
+          currentCatCount: _countByType('Cat'),
+          maxDogs: maxDogs,
+          maxCats: maxCats,
+        ),
+        settings: RouteSettings(
+          arguments: {
+            'maxDogs': maxDogs,
+            'maxCats': maxCats,
+            'totalExpected': maxDogs + maxCats,
+          },
+        ),
+      )
+    );
+
+    if (result != null && result is Map<String, dynamic>) {
+      setState(() { 
+        if (isEditing) { 
+          _petFamily[index!] = result; 
+        } else { 
+          _petFamily.add(result); 
+        } 
+      });
+    }
+  }
+  
+
+  void _navigateToStepFive() {
+    final Map<String, dynamic> dataToSend = Map.from(_allData);
+    dataToSend['pets'] = List<Map<String, dynamic>>.from(_petFamily);
+
+    Navigator.push(
+      context, 
+      MaterialPageRoute(
+        builder: (context) => const StepFiveScreen(), 
+        settings: RouteSettings(arguments: dataToSend) 
+      )
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-
-          // 🔥 IMPROVED AVATAR
-          Container(
-            height: 55,
-            width: 55,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              color: Color(0xFFFDF7F0),
-            ),
-            child: const Icon(Icons.pets, color: Colors.orange, size: 30),
-          ),
-
-          const SizedBox(width: 14),
-
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      color: Color(0xFF2D2D2D)),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  details,
-                  style: const TextStyle(
-                      color: Colors.grey, fontSize: 13),
-                ),
-              ],
-            ),
-          ),
-
-          // 🔥 STATUS CHIP
-          Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: const Color(0xFFE8F5E9),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Text(
-              "Added",
-              style: TextStyle(
-                  color: Colors.green,
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold),
-            ),
-          ),
+          Icon(Icons.pets_rounded, size: 60, color: Colors.grey.shade200),
+          const SizedBox(height: 16),
+          Text("No pets added yet", style: TextStyle(color: Colors.grey.shade400, fontWeight: FontWeight.w500)),
         ],
       ),
     );
