@@ -1,12 +1,21 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- ✅ LOCATION PERMISSION (ADD THIS) -->
+    <!-- ✅ PERMISSIONS -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
 
     <application
         android:label="pet_verse"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:usesCleartextTraffic="true">
+
+        <!-- ✅ GOOGLE MAPS API KEY -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="AIzaSyDxCZcs_0G6xEFtZ9p-uj2Fhx5MTAI-hS4"/>
 
         <activity
             android:name=".MainActivity"
@@ -19,9 +28,8 @@
             android:windowSoftInputMode="adjustResize">
 
             <meta-data
-              android:name="io.flutter.embedding.android.NormalTheme"
-              android:resource="@style/NormalTheme"
-              />
+                android:name="io.flutter.embedding.android.NormalTheme"
+                android:resource="@style/NormalTheme" />
 
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
@@ -33,9 +41,9 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
     </application>
 
-    <!-- Required queries -->
     <queries>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
