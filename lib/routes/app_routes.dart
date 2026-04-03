@@ -64,7 +64,7 @@ class AppRoutes {
   // 🔥 MAIN APP
   static const String home = '/home';
 
-  // 🔥 HOME FEATURES
+  // 🔥 CORE FEATURES
   static const String emergency = '/emergency';
   static const String lost = '/lost';
   static const String booking = '/booking';
@@ -99,9 +99,11 @@ class AppRoutes {
   static const String skin = '/skin';
 
   // 🔥 ROUTE GENERATOR
-  static Route<dynamic> generateRoute(RouteSettings routeSettings) {
-    switch (routeSettings.name) {
+  static Route<dynamic> generateRoute(RouteSettings settings) {
+    // ✅ CENTRAL ARGUMENT HANDLING (from your friend’s code)
+    final args = settings.arguments as Map<String, dynamic>?;
 
+    switch (settings.name) {
       // 🔹 AUTH FLOW
       case splash:
         return MaterialPageRoute(builder: (_) => const SplashScreen());
@@ -115,30 +117,39 @@ class AppRoutes {
       case signup:
         return MaterialPageRoute(builder: (_) => const SignUpScreen());
 
-      // 🔹 ONBOARDING STEPS
+      // 🔹 ONBOARDING STEPS (WITH ARGUMENT RELAY)
       case stepOne:
         return MaterialPageRoute(builder: (_) => const StepOneScreen());
 
       case stepTwo:
-        return MaterialPageRoute(builder: (_) => const StepTwoScreen());
+        return MaterialPageRoute(
+          builder: (_) => const StepTwoScreen(),
+          settings: RouteSettings(arguments: args),
+        );
 
       case stepThree:
-        return MaterialPageRoute(builder: (_) => const StepThreeScreen());
+        return MaterialPageRoute(
+          builder: (_) => const StepThreeScreen(),
+          settings: RouteSettings(arguments: args),
+        );
 
       case stepFour:
-        return MaterialPageRoute(builder: (_) => const StepFourScreen());
+        return MaterialPageRoute(
+          builder: (_) => const StepFourScreen(),
+          settings: RouteSettings(arguments: args),
+        );
 
       case stepFive:
-        final args = routeSettings.arguments as List<Map<String, String>>?;
         return MaterialPageRoute(
           builder: (_) => const StepFiveScreen(),
           settings: RouteSettings(arguments: args),
         );
 
-      // 🔹 MAIN APP ENTRY
+      // 🔹 MAIN APP ENTRY (IMPORTANT FIX)
       case home:
         return MaterialPageRoute(
           builder: (_) => const MainNavigation(),
+          settings: RouteSettings(arguments: args),
         );
 
       // 🔹 CORE FEATURES
@@ -216,7 +227,7 @@ class AppRoutes {
       case skin:
         return MaterialPageRoute(builder: (_) => const DermatologicalScanScreen());
 
-      // ✅ FIXED DEFAULT (IMPORTANT)
+      // ✅ SAFE DEFAULT (NO CRASH)
       default:
         return MaterialPageRoute(
           builder: (_) => const OnboardingScreen(),

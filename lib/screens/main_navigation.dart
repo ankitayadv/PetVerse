@@ -23,40 +23,100 @@ class _MainNavigationState extends State<MainNavigation> {
     });
   }
 
-  late final List<Widget> screens;
+  // 🔥 GLOBAL STATE (from your friend's code)
+  Map<String, dynamic>? selectedPet;
+  List<Map<String, dynamic>> allPets = [];
+
+  String? ownerName;
+  dynamic ownerImage;
+  String? ownerLocation;
 
   @override
-  void initState() {
-    super.initState();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
 
-    // 🔥 PASS FUNCTION TO SCREENS THAT NEED BACK CONTROL
-    screens = [
-      HomeScreen(),
-      LostScreen(onBackToHome: () => changeTab(0)), // ✅ FIXED
-      HealthScreen(),
-      VetScreen(),
-      ProfileScreen(),
-    ];
+    final args =
+        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+
+    if (selectedPet == null) {
+      if (args != null && args.containsKey('selectedPet')) {
+        // ✅ FROM ONBOARDING / PROFILE
+        selectedPet = args['selectedPet'];
+        allPets = List<Map<String, dynamic>>.from(args['allPets'] ?? []);
+
+        ownerName = args['ownerName'] ?? "User";
+        ownerImage = args['ownerImage'];
+        ownerLocation = args['ownerLocation'] ?? "Not Set";
+      } else {
+        // ✅ FALLBACK (NO CRASH)
+        selectedPet = {
+          "name": "Buddy",
+          "breed": "Golden Retriever",
+        };
+        allPets = [selectedPet!];
+
+        ownerName = "Pet Lover";
+        ownerLocation = "Location not set";
+      }
+    }
+  }
+
+  // 🔥 PET SWITCH HANDLER
+  void updatePet(Map<String, dynamic> newPet) {
+    setState(() {
+      selectedPet = newPet;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    // 🔥 LOADING SAFE (NO BLANK SCREEN)
+    if (selectedPet == null) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(color: Colors.orange),
+        ),
+      );
+    }
+
+    final List<Widget> screens = [
+      HomeScreen(
+        selectedPet: selectedPet!,
+        allPets: allPets,
+        onPetSwitched: updatePet,
+        ownerName: ownerName ?? "User",
+        ownerImage: ownerImage,
+        ownerLocation: ownerLocation ?? "Not Set",
+      ),
+
+      // ✅ YOUR BACK FIX PRESERVED
+      LostScreen(onBackToHome: () => changeTab(0)),
+
+      const HealthScreen(),
+      const VetScreen(),
+
+      ProfileScreen(
+        ownerName: ownerName ?? "User",
+        ownerImage: ownerImage,
+        ownerLocation: ownerLocation ?? "Not Set",
+        selectedPet: selectedPet!,
+      ),
+    ];
+
     return WillPopScope(
-      // 🔥 HANDLE PHONE BACK BUTTON
+      // 🔥 YOUR BACK BUTTON LOGIC PRESERVED
       onWillPop: () async {
         if (currentIndex != 0) {
-          changeTab(0); // go to Home tab
+          changeTab(0);
           return false;
         }
-        return false; // prevent app exit
+        return false;
       },
-
       child: Scaffold(
         body: IndexedStack(
           index: currentIndex,
           children: screens,
         ),
-
         bottomNavigationBar: BottomNavigationBar(
           currentIndex: currentIndex,
           onTap: changeTab,
@@ -66,25 +126,15 @@ class _MainNavigationState extends State<MainNavigation> {
           showUnselectedLabels: true,
           items: const [
             BottomNavigationBarItem(
-              icon: Icon(Icons.home),
-              label: "Home",
-            ),
+                icon: Icon(Icons.home), label: "Home"),
             BottomNavigationBarItem(
-              icon: Icon(Icons.search),
-              label: "Lost",
-            ),
+                icon: Icon(Icons.search), label: "Lost"),
             BottomNavigationBarItem(
-              icon: Icon(Icons.favorite),
-              label: "Health",
-            ),
+                icon: Icon(Icons.favorite), label: "Health"),
             BottomNavigationBarItem(
-              icon: Icon(Icons.local_hospital),
-              label: "Vets",
-            ),
+                icon: Icon(Icons.local_hospital), label: "Vets"),
             BottomNavigationBarItem(
-              icon: Icon(Icons.person),
-              label: "Profile",
-            ),
+                icon: Icon(Icons.person), label: "Profile"),
           ],
         ),
       ),
