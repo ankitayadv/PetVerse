@@ -6,8 +6,29 @@ class PetcareTrainingArticleScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Training Article")),
-      body: const Center(child: Text("Training Article Screen")),
+      appBar: AppBar(
+        title: const Text("Pet Training Article"),
+        centerTitle: true,
+      ),
+      body: const Center(
+        child: Text(
+          "Pet Training Article Screen Working ✅",
+          style: TextStyle(fontSize: 18),
+        ),
+      ),
     );
   }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+

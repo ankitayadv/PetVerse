@@ -1,6 +1,6 @@
 name: pet_verse
 description: "A new Flutter project."
-publish_to: 'none'
+publish_to: "none"
 
 version: 1.0.0+1
 
@@ -56,6 +56,17 @@ flutter:
     - assets/images/petcare_logo.png
     - assets/images/routine_logo.png
     - assets/images/vaccine_logo.png
+    - assets/images/dog_feeding.jpg
+    - assets/images/dog_grooming.jpg
+    - assets/images/dog_tranning.jpg
+    - assets/images/dog_walking.jpg
+    - assets/images/petcare_behavior_screen.jpg
+    - assets/images/petcare_obedience_screen.jpeg
+    - assets/images/petcare_training_screen.jpg
+    - assets/images/avoid.jpeg
+    - assets/images/best.jpeg
+    - assets/images/diet.jpg
+    - assets/images/hydration.jpeg
 
   fonts:
     - family: Poppins

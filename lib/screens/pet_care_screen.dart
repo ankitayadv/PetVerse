@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../routes/app_routes.dart'; // ✅ IMPORTANT
+import '../routes/app_routes.dart';
 
 class PetCareScreen extends StatelessWidget {
   const PetCareScreen({super.key});
@@ -13,132 +13,124 @@ class PetCareScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF7F9FC),
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
           'Pet Care Guide',
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: Colors.black,
+            fontWeight: FontWeight.w700,
+          ),
         ),
         actions: [
           IconButton(
-            onPressed: () => _showSnack(context, "Notifications clicked"),
-            icon: Stack(
-              children: [
-                const Icon(Icons.notifications_none, color: Colors.black),
-                Positioned(
-                  right: 0,
-                  top: 2,
-                  child: Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                      color: Colors.orange,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+            onPressed: () => _showSnack(context, "Notifications"),
+            icon: const Icon(Icons.notifications_none, color: Colors.black),
           ),
-          const SizedBox(width: 10),
         ],
       ),
 
       body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 10),
 
-            // -------- CATEGORY GRID --------
+            const Text(
+              "Categories",
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+
+            const SizedBox(height: 15),
+
+            // 🔹 CATEGORY ROW 1
             Row(
               children: [
                 _buildCategoryCard(
                   context,
                   title: 'Training',
-                  icon: Icons.pets,
-                  color: const Color(0xFFFFEBDD),
-                  onTap: () {
-                    Navigator.pushNamed(context, AppRoutes.training);
-                  },
+                  imagePath: 'assets/images/dog_tranning.jpg',
+                  onTap: () =>
+                      Navigator.pushNamed(context, AppRoutes.training),
                 ),
                 const SizedBox(width: 15),
                 _buildCategoryCard(
                   context,
                   title: 'Feeding',
-                  icon: Icons.restaurant,
-                  color: const Color(0xFFDFF6FF),
-                  onTap: () {
-                    Navigator.pushNamed(context, AppRoutes.feeding);
-                  },
+                  imagePath: 'assets/images/dog_feeding.jpg',
+                  onTap: () =>
+                      Navigator.pushNamed(context, AppRoutes.feeding),
                 ),
               ],
             ),
 
             const SizedBox(height: 15),
 
+            // 🔹 CATEGORY ROW 2
             Row(
               children: [
                 _buildCategoryCard(
                   context,
                   title: 'Grooming',
-                  icon: Icons.cleaning_services,
-                  color: const Color(0xFFFBEFFF),
-                  onTap: () => _showSnack(context, "Grooming clicked"),
+                  imagePath: 'assets/images/dog_grooming.jpg',
+                  onTap: () => _showSnack(context, "Grooming"),
                 ),
                 const SizedBox(width: 15),
                 _buildCategoryCard(
                   context,
                   title: 'Walking',
-                  icon: Icons.directions_walk,
-                  color: const Color(0xFFE5FFED),
-                  onTap: () => _showSnack(context, "Walking clicked"),
+                  imagePath: 'assets/images/dog_walking.jpg',
+                  onTap: () => _showSnack(context, "Walking"),
                 ),
               ],
             ),
 
             const SizedBox(height: 30),
 
-            // -------- ARTICLES --------
             const Text(
               'Featured Articles',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
             ),
+
             const SizedBox(height: 15),
 
-            _buildArticleTile(
+            _buildArticleCard(
               context,
               title: 'How to Train Your Dog',
-              subtitle: 'Your daily training tips',
+              subtitle: 'Daily training techniques',
               imageUrl:
                   'https://images.unsplash.com/photo-1583511655857-d19b40a7a54e',
-              onTap: () {
-                Navigator.pushNamed(context, AppRoutes.trainingArticle);
-              },
+              onTap: () =>
+                  Navigator.pushNamed(context, AppRoutes.trainingArticle),
             ),
 
-            _buildArticleTile(
+            _buildArticleCard(
               context,
               title: 'Best Foods for Pets',
-              subtitle: 'Ensure good nutrition',
+              subtitle: 'Healthy nutrition guide',
               imageUrl:
                   'https://images.unsplash.com/photo-1601758228041-f3b2795255f1',
-              onTap: () {
-                Navigator.pushNamed(context, AppRoutes.bestFood);
-              },
+              onTap: () =>
+                  Navigator.pushNamed(context, AppRoutes.bestFood),
             ),
 
-            _buildArticleTile(
+            _buildArticleCard(
               context,
               title: 'Daily Grooming Tips',
-              subtitle: 'Keep your pet healthy',
+              subtitle: 'Keep your pet clean & healthy',
               imageUrl:
                   'https://images.unsplash.com/photo-1518717758536-85ae29035b6d',
               onTap: () => _showSnack(context, "Open Grooming Article"),
@@ -146,26 +138,24 @@ class PetCareScreen extends StatelessWidget {
 
             const SizedBox(height: 25),
 
-            // -------- BUTTON --------
+            // 🔹 BUTTON
             SizedBox(
               width: double.infinity,
               height: 55,
               child: ElevatedButton(
-                onPressed: () =>
-                    _showSnack(context, "Explore More Clicked"),
+                onPressed: () => _showSnack(context, "Explore More"),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFEBB16B),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30),
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  elevation: 0,
+                  elevation: 2,
                 ),
                 child: const Text(
                   'Explore More',
                   style: TextStyle(
-                    color: Colors.white,
                     fontSize: 16,
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
@@ -178,11 +168,10 @@ class PetCareScreen extends StatelessWidget {
     );
   }
 
-  // -------- CATEGORY CARD --------
+  // 🔥 CATEGORY CARD WITH BACKGROUND IMAGE
   Widget _buildCategoryCard(BuildContext context,
       {required String title,
-      required IconData icon,
-      required Color color,
+      required String imagePath,
       required VoidCallback onTap}) {
     return Expanded(
       child: GestureDetector(
@@ -190,48 +179,35 @@ class PetCareScreen extends StatelessWidget {
         child: Container(
           height: 140,
           decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 10,
-              )
-            ],
+            borderRadius: BorderRadius.circular(20),
+            image: DecorationImage(
+              image: AssetImage(imagePath),
+              fit: BoxFit.cover,
+            ),
           ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.4),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  icon,
-                  size: 40,
-                  color: Colors.black87,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              color: Colors.black.withOpacity(0.35), // overlay
+            ),
+            child: Center(
+              child: Text(
                 title,
                 style: const TextStyle(
-                  fontSize: 16,
+                  color: Colors.white,
+                  fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: Colors.black87,
                 ),
               ),
-            ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  // -------- ARTICLE TILE --------
-  Widget _buildArticleTile(BuildContext context,
+  // 🔹 ARTICLE CARD
+  Widget _buildArticleCard(BuildContext context,
       {required String title,
       required String subtitle,
       required String imageUrl,
@@ -239,56 +215,57 @@ class PetCareScreen extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(12),
+        margin: const EdgeInsets.only(bottom: 15),
         decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey.shade100),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.03),
-              blurRadius: 8,
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 10,
             )
           ],
         ),
         child: Row(
           children: [
             ClipRRect(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius:
+                  const BorderRadius.horizontal(left: Radius.circular(18)),
               child: Image.network(
                 imageUrl,
-                width: 55,
-                height: 55,
+                width: 90,
+                height: 90,
                 fit: BoxFit.cover,
               ),
             ),
-            const SizedBox(width: 15),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style:
-                        const TextStyle(fontSize: 13, color: Colors.grey),
-                  ),
-                ],
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 5),
+                    Text(subtitle,
+                        style: const TextStyle(
+                            fontSize: 12, color: Colors.grey)),
+                  ],
+                ),
               ),
             ),
-            const Icon(Icons.chevron_right,
-                color: Colors.grey, size: 20),
+            const Padding(
+              padding: EdgeInsets.only(right: 10),
+              child: Icon(Icons.arrow_forward_ios,
+                  size: 16, color: Colors.grey),
+            )
           ],
         ),
       ),
     );
   }
 }
+
+
+
