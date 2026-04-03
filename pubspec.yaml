@@ -11,6 +11,8 @@ dependencies:
   flutter:
     sdk: flutter
 
+
+
   cupertino_icons: ^1.0.8
   intl: ^0.20.2
   geolocator: ^14.0.2
@@ -19,6 +21,10 @@ dependencies:
   just_audio: ^0.9.36
   permission_handler: ^11.3.1
   table_calendar: ^3.1.0
+  firebase_core: 2.22.0
+  cloud_firestore: 4.12.2
+  firebase_auth: 4.14.0
+  google_sign_in: ^6.1.6  
 
   # 🔥 NEW ADDED
   url_launcher: ^6.1.11
