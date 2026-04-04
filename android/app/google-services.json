@@ -1,41 +1,41 @@
 {
   "project_info": {
-    "project_number": "886589496686",
-    "project_id": "petverse-7cb5c",
-    "storage_bucket": "petverse-7cb5c.firebasestorage.app"
+    "project_number": "182583493078",
+    "project_id": "petverse-6035e",
+    "storage_bucket": "petverse-6035e.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:886589496686:android:5ca628b0b398336cdf357f",
+        "mobilesdk_app_id": "1:182583493078:android:ba2a2231e38dc2f77f2477",
         "android_client_info": {
           "package_name": "com.example.pet_verse"
         }
       },
       "oauth_client": [
         {
-          "client_id": "886589496686-oemv8536qqk45odr33l1hjfmjg3j3h0u.apps.googleusercontent.com",
+          "client_id": "182583493078-h3jgf6miulg1rnk6mhjsuehfjlni5smp.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.example.pet_verse",
-            "certificate_hash": "565ec015cec9dec36a44af5c29c556a10caafde3"
+            "certificate_hash": "b44326cd11bca0230e6b7066313d2a2de0aeaef8"
           }
         },
         {
-          "client_id": "886589496686-vk97tcjs335cqgdf8qid8l1aeniokbbf.apps.googleusercontent.com",
+          "client_id": "182583493078-2hvave7mh1ek7s9adqjqmp6vbu5squ5r.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyDdqNBzX1b8n74hjffVOhVArVPmQrPkqlI"
+          "current_key": "AIzaSyCRhIq67gKclqLihaC4mjWmb7bv1Eb0Rpc"
         }
       ],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "886589496686-vk97tcjs335cqgdf8qid8l1aeniokbbf.apps.googleusercontent.com",
+              "client_id": "182583493078-2hvave7mh1ek7s9adqjqmp6vbu5squ5r.apps.googleusercontent.com",
               "client_type": 3
             }
           ]

@@ -3,38 +3,48 @@ import 'routes/app_routes.dart';
 import 'package:firebase_core/firebase_core.dart';
 
 void main() async {
-WidgetsFlutterBinding.ensureInitialized();
-await Firebase.initializeApp();
-runApp(const PetVerseApp()); // ✅ fixed here
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // 🔥 SAFE FIREBASE INIT
+  try {
+    await Firebase.initializeApp();
+  } catch (e) {
+    debugPrint("Firebase init error: $e");
+  }
+
+  runApp(const PetVerseApp());
 }
 
 class PetVerseApp extends StatelessWidget {
-const PetVerseApp({super.key});
+  const PetVerseApp({super.key});
 
-@override
-Widget build(BuildContext context) {
-return MaterialApp(
-debugShowCheckedModeBanner: false,
-title: 'PetVerse',
-  theme: ThemeData(
-    useMaterial3: true,
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'PetVerse',
 
-    // ✅ GLOBAL FONT
-    fontFamily: 'Poppins',
+      // 🔥 GLOBAL THEME
+      theme: ThemeData(
+        useMaterial3: true,
 
-    colorScheme: ColorScheme.fromSeed(
-      seedColor: Colors.orange,
-    ),
+        fontFamily: 'Poppins',
 
-    // 🔥 OPTIONAL (makes UI cleaner)
-    scaffoldBackgroundColor: Colors.white,
-  ),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.orange,
+        ),
 
-  // 🔥 Start from Splash
-  initialRoute: AppRoutes.splash,
+        scaffoldBackgroundColor: Colors.white,
+      ),
 
-  // 🔥 Centralized navigation
-  onGenerateRoute: AppRoutes.generateRoute,
-);
-}
+      // 🔥 START ROUTE
+      initialRoute: AppRoutes.splash,
+
+      // 🔥 CENTRAL ROUTING SYSTEM
+      onGenerateRoute: AppRoutes.generateRoute,
+
+      // 🔥 OPTIONAL (for debugging layouts)
+      debugShowMaterialGrid: false,
+    );
+  }
 }

@@ -10,6 +10,7 @@ import '../screens/step_two_screen.dart';
 import '../screens/step_three_screen.dart';
 import '../screens/step_four_screen.dart';
 import '../screens/step_five_screen.dart';
+import '../screens/ai_matching_screen.dart';
 
 // 🔥 MAIN NAVIGATION
 import '../screens/main_navigation.dart';
@@ -26,6 +27,13 @@ import '../screens/pet_care_screen.dart';
 import '../screens/report_lost_screen.dart';
 import '../screens/report_found_screen.dart';
 import '../screens/map_view_screen.dart';
+
+// 🔥 NEW FLOW SCREENS
+import '../screens/pet_detail_screen.dart';
+import '../screens/match_results_screen.dart';
+import '../screens/my_reports_screen.dart';
+import '../screens/report_success_screen.dart';
+import '../screens/reunion_success_screen.dart';
 
 // 🔥 PET CARE MODULE
 import '../screens/petcare_feeding_screen.dart';
@@ -77,6 +85,16 @@ class AppRoutes {
   static const String reportLost = '/reportLost';
   static const String reportFound = '/reportFound';
   static const String mapView = '/mapView';
+  static const String matchResult = '/matchResult';
+  static const String aiMatch = '/aiMatch';
+
+
+  // 🔥 NEW FLOW
+  static const String petDetail = '/petDetail';
+  static const String matchResults = '/matchResults';
+  static const String myReports = '/myReports';
+  static const String success = '/success';
+  static const String reunion = '/reunion';
 
   // 🔥 PET CARE MODULE
   static const String feeding = '/feeding';
@@ -100,10 +118,10 @@ class AppRoutes {
 
   // 🔥 ROUTE GENERATOR
   static Route<dynamic> generateRoute(RouteSettings settings) {
-    // ✅ CENTRAL ARGUMENT HANDLING (from your friend’s code)
     final args = settings.arguments as Map<String, dynamic>?;
 
     switch (settings.name) {
+
       // 🔹 AUTH FLOW
       case splash:
         return MaterialPageRoute(builder: (_) => const SplashScreen());
@@ -117,7 +135,7 @@ class AppRoutes {
       case signup:
         return MaterialPageRoute(builder: (_) => const SignUpScreen());
 
-      // 🔹 ONBOARDING STEPS (WITH ARGUMENT RELAY)
+      // 🔹 STEPS
       case stepOne:
         return MaterialPageRoute(builder: (_) => const StepOneScreen());
 
@@ -145,7 +163,7 @@ class AppRoutes {
           settings: RouteSettings(arguments: args),
         );
 
-      // 🔹 MAIN APP ENTRY (IMPORTANT FIX)
+      // 🔹 MAIN APP
       case home:
         return MaterialPageRoute(
           builder: (_) => const MainNavigation(),
@@ -180,9 +198,50 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) => const ReportFoundScreen());
 
       case mapView:
-        return MaterialPageRoute(builder: (_) => const MapViewScreen());
+        return MaterialPageRoute(
+          builder: (_) => const MapViewScreen(),
+          settings: settings, // 🔥 IMPORTANT
+        );
 
-      // 🔹 PET CARE FLOW
+       case aiMatch:
+           return MaterialPageRoute(
+         builder: (_) => const AiMatchingScreen(),
+               settings: settings,
+               );
+
+
+
+            // 🔥 FIXED FLOW (VERY IMPORTANT)
+      case petDetail:
+        return MaterialPageRoute(
+          builder: (_) => const PetDetailScreen(),
+          settings: settings, // 🔥 FIX
+        );
+
+      case matchResult:
+  return MaterialPageRoute(
+    builder: (_) => const MatchResultScreen(),
+    settings: settings, );
+
+      case myReports:
+        return MaterialPageRoute(
+          builder: (_) => const MyReportsScreen(),
+          settings: settings,
+        );
+
+      case success:
+        return MaterialPageRoute(
+          builder: (_) => const ReportSuccessScreen(),
+          settings: settings,
+        );
+
+      case reunion:
+        return MaterialPageRoute(
+          builder: (_) => const ReunionSuccessScreen(),
+          settings: settings,
+        );
+
+      // 🔹 PET CARE
       case feeding:
         return MaterialPageRoute(builder: (_) => const PetcareFeedingScreen());
 
@@ -214,7 +273,7 @@ class AppRoutes {
       case reminders:
         return MaterialPageRoute(builder: (_) => const RemindersAlertsScreen());
 
-      // 🔹 EXTRA FEATURES
+      // 🔹 EXTRA
       case vetBooking:
         return MaterialPageRoute(builder: (_) => const VetsBookAppointmentsScreen());
 
@@ -227,11 +286,9 @@ class AppRoutes {
       case skin:
         return MaterialPageRoute(builder: (_) => const DermatologicalScanScreen());
 
-      // ✅ SAFE DEFAULT (NO CRASH)
+      // ✅ SAFE DEFAULT
       default:
-        return MaterialPageRoute(
-          builder: (_) => const OnboardingScreen(),
-        );
+        return MaterialPageRoute(builder: (_) => const OnboardingScreen());
     }
   }
 }
