@@ -1,7 +1,13 @@
-import 'package:flutter/material.dart';
+import 'dart:convert';
 import 'dart:io';
+import 'dart:async';
+import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:typed_data';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
 
 class ProfileScreen extends StatefulWidget {
   final String ownerName;
@@ -29,29 +35,81 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   static const Color textMain = Color(0xFF2D2D2D);
   static const Color softBorder = Color(0xFFFFEBD2);
 
+  // Data State
+  Map<String, dynamic>? _liveUserData;
+  StreamSubscription<DocumentSnapshot>? _userSubscription;
+  String _currentLocation = "Fetching...";
+  bool _isAnimated = false;
+
   // Activity Streak Data
   final List<bool> weeklyStreak = [true, true, true, true, true, false, false];
   final List<String> days = ["M", "T", "W", "T", "F", "S", "S"];
-  bool _isAnimated = false;
 
   @override
   void initState() {
     super.initState();
+    _currentLocation = widget.ownerLocation.isNotEmpty ? widget.ownerLocation : "Fetching...";
+    _initFirebaseListener();
+    _initLocationService();
     Future.delayed(const Duration(milliseconds: 150), () {
       if (mounted) setState(() => _isAnimated = true);
     });
   }
 
-  int _calculateStreak() {
-    int streak = 0;
-    for (bool done in weeklyStreak) {
-      if (done) {
-        streak++;
-      } else {
-        break;
-      }
+  void _initFirebaseListener() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      _userSubscription = FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .snapshots()
+          .listen((snapshot) {
+        if (snapshot.exists && mounted) {
+          setState(() {
+            _liveUserData = snapshot.data();
+          });
+        }
+      });
     }
-    return streak;
+  }
+
+  Future<void> _initLocationService() async {
+    try {
+      Position position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high);
+      List<Placemark> placemarks = await placemarkFromCoordinates(position.latitude, position.longitude);
+      if (mounted && placemarks.isNotEmpty) {
+        setState(() {
+          Placemark place = placemarks.first;
+          _currentLocation = "${place.locality ?? 'Nearby'}, ${place.administrativeArea ?? ''}";
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _currentLocation = widget.ownerLocation);
+    }
+  }
+
+  @override
+  void dispose() {
+    _userSubscription?.cancel();
+    super.dispose();
+  }
+
+  int _calculateStreak() {
+    return weeklyStreak.where((done) => done).length;
+  }
+
+  ImageProvider _getOwnerImage() {
+    final liveBase64 = _liveUserData?['ownerImageBase64'];
+    if (liveBase64 != null && liveBase64.toString().isNotEmpty) {
+      return MemoryImage(base64Decode(liveBase64));
+    }
+    if (widget.ownerImage != null) {
+      if (widget.ownerImage is Uint8List) return MemoryImage(widget.ownerImage);
+      if (widget.ownerImage is File) return FileImage(widget.ownerImage);
+      if (widget.ownerImage is String && widget.ownerImage.startsWith('http')) return NetworkImage(widget.ownerImage);
+    }
+    return const NetworkImage("https://cdn-icons-png.flaticon.com/512/149/149071.png");
   }
 
   @override
@@ -65,7 +123,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         automaticallyImplyLeading: false,
         title: const Text(
           "My Profile",
-          style: TextStyle(color: textMain, fontWeight: FontWeight.bold, fontSize: 20)
+          style: TextStyle(color: textMain, fontWeight: FontWeight.bold, fontSize: 20, fontFamily: 'Poppins')
         ),
       ),
       body: SingleChildScrollView(
@@ -77,7 +135,6 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
             _buildProfileHeader(),
             const SizedBox(height: 25),
             
-            // Activity Streak Section
             AnimatedPadding(
               duration: const Duration(milliseconds: 600),
               padding: EdgeInsets.only(top: _isAnimated ? 0 : 20),
@@ -103,6 +160,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   }
 
   Widget _buildProfileHeader() {
+    final String name = _liveUserData?['ownerName'] ?? (_liveUserData?['fullName'] ?? widget.ownerName);
+    
     return Column(
       children: [
         Stack(
@@ -114,14 +173,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
               child: CircleAvatar(
                 radius: 55,
                 backgroundColor: Colors.white,
-                backgroundImage: widget.ownerImage != null 
-                    ? (widget.ownerImage is Uint8List 
-                        ? MemoryImage(widget.ownerImage) 
-                        : FileImage(File(widget.ownerImage.path)) as ImageProvider)
-                    : null,
-                child: widget.ownerImage == null 
-                    ? const Icon(Icons.person, size: 50, color: brandOrange) 
-                    : null,
+                backgroundImage: _getOwnerImage(),
               ),
             ),
             Container(
@@ -136,15 +188,15 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           ],
         ),
         const SizedBox(height: 16),
-        Text(widget.ownerName, 
-          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: textMain)),
+        Text(name, 
+          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: textMain, fontFamily: 'Poppins')),
         const SizedBox(height: 6),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const Icon(Icons.location_on_rounded, size: 14, color: brandOrange),
             const SizedBox(width: 4),
-            Text(widget.ownerLocation, style: const TextStyle(color: Colors.grey, fontSize: 13)),
+            Text(_currentLocation, style: const TextStyle(color: Colors.grey, fontSize: 13, fontFamily: 'Poppins')),
           ],
         ),
         const SizedBox(height: 12),
@@ -155,7 +207,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
             borderRadius: BorderRadius.circular(20)
           ),
           child: const Text("Premium Pet Parent 🐾", 
-            style: TextStyle(color: brandOrange, fontSize: 12, fontWeight: FontWeight.bold)),
+            style: TextStyle(color: brandOrange, fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'Poppins')),
         ),
       ],
     );
@@ -173,11 +225,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         ),
         borderRadius: BorderRadius.circular(32),
         boxShadow: [
-          BoxShadow(
-            color: brandOrange.withOpacity(0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          )
+          BoxShadow(color: brandOrange.withOpacity(0.3), blurRadius: 20, offset: const Offset(0, 10))
         ],
       ),
       child: Column(
@@ -188,9 +236,9 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text("Activity Streak", style: TextStyle(color: Colors.white70, fontSize: 14)),
+                  const Text("Activity Streak", style: TextStyle(color: Colors.white70, fontSize: 14, fontFamily: 'Poppins')),
                   Text("${streak.toString().padLeft(2, '0')} Days 🔥", 
-                    style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+                    style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold, fontFamily: 'Poppins')),
                 ],
               ),
               const Icon(Icons.auto_graph_rounded, color: Colors.white, size: 32),
@@ -203,7 +251,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
               bool isDone = weeklyStreak[index];
               return Column(
                 children: [
-                  Text(days[index], style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                  Text(days[index], style: const TextStyle(color: Colors.white70, fontSize: 12, fontFamily: 'Poppins')),
                   const SizedBox(height: 8),
                   Icon(isDone ? Icons.check_circle : Icons.circle_outlined, color: Colors.white, size: 22),
                 ],
@@ -216,8 +264,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   }
 
   Widget _buildDetailedPetCard() {
-    final pet = widget.selectedPet;
-    final dynamic petImg = pet['image'];
+    final pet = _liveUserData?['selectedPet'] ?? widget.selectedPet;
+    final String? petBase64 = pet['imageBase64'];
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -239,8 +287,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(22),
-                  child: petImg != null
-                    ? (kIsWeb ? Image.network(petImg.path, fit: BoxFit.cover) : Image.file(File(petImg.path), fit: BoxFit.cover))
+                  child: petBase64 != null && petBase64.isNotEmpty
+                    ? Image.memory(base64Decode(petBase64), fit: BoxFit.cover)
                     : const Icon(Icons.pets, color: brandOrange, size: 30),
                 ),
               ),
@@ -250,12 +298,12 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(pet['name'] ?? "My Pet", 
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 22, color: textMain)),
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 22, color: textMain, fontFamily: 'Poppins')),
                     Row(
                       children: [
                         const Icon(Icons.verified_rounded, color: Colors.green, size: 14),
                         const SizedBox(width: 4),
-                        Text("Fully Vaccinated", style: TextStyle(color: Colors.green.shade700, fontSize: 13, fontWeight: FontWeight.w600)),
+                        Text("Fully Vaccinated", style: TextStyle(color: Colors.green.shade700, fontSize: 13, fontWeight: FontWeight.w600, fontFamily: 'Poppins')),
                       ],
                     ),
                   ],
@@ -267,8 +315,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           const Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text("Health Progress", style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.w600)),
-              Text("85%", style: TextStyle(color: brandOrange, fontSize: 12, fontWeight: FontWeight.bold)),
+              Text("Health Progress", style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.w600, fontFamily: 'Poppins')),
+              Text("85%", style: TextStyle(color: brandOrange, fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'Poppins')),
             ],
           ),
           const SizedBox(height: 8),
@@ -300,13 +348,12 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       children: [
         Icon(icon, color: brandOrange.withOpacity(0.5), size: 20),
         const SizedBox(height: 6),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: textMain)),
-        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 11)),
+        Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: textMain, fontFamily: 'Poppins')),
+        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 11, fontFamily: 'Poppins')),
       ],
     );
   }
 
-  // UPDATED: Settings Group with new options
   Widget _buildSettingsGroup() {
     return Container(
       decoration: BoxDecoration(
@@ -320,13 +367,12 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           _buildActionTile("Edit Pet Profile", Icons.pets_outlined, () {}),
           _buildActionTile("Privacy & Security", Icons.shield_outlined, () {}),
           _buildActionTile("Reminders & Alerts", Icons.notifications_none_outlined, () {}),
-          _buildActionTile("Sign Out", Icons.logout_rounded, _showLogoutDialog, isDestructive: true),
+          _buildActionTile("Sign Out", Icons.logout_rounded, _handleLogout, isDestructive: true),
         ],
       ),
     );
   }
 
-  // UPDATED: Action Tile to match the visual style
   Widget _buildActionTile(String title, IconData icon, VoidCallback tap, {bool isDestructive = false}) {
     return ListTile(
       onTap: tap,
@@ -339,14 +385,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         ),
         child: Icon(icon, color: isDestructive ? Colors.redAccent : brandOrange, size: 22),
       ),
-      title: Text(
-        title, 
-        style: TextStyle(
-          color: isDestructive ? Colors.redAccent : textMain, 
-          fontWeight: FontWeight.w600,
-          fontSize: 15
-        )
-      ),
+      title: Text(title, style: TextStyle(color: isDestructive ? Colors.redAccent : textMain, fontWeight: FontWeight.w600, fontSize: 15, fontFamily: 'Poppins')),
       trailing: const Icon(Icons.chevron_right_rounded, size: 22, color: Colors.grey),
     );
   }
@@ -354,27 +393,30 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   Widget _buildSectionLabel(String title) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16, left: 4), 
-      child: Row(children: [Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textMain))])
+      child: Row(children: [Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textMain, fontFamily: 'Poppins'))])
     );
   }
 
-  void _showLogoutDialog() {
+  void _handleLogout() async {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: surfaceWhite,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-        title: const Text("Sign Out", style: TextStyle(fontWeight: FontWeight.bold)),
-        content: const Text("Ready to leave PetVerse for a while?"),
+        title: const Text("Sign Out", style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Poppins')),
+        content: const Text("Ready to leave PetVerse for a while?", style: TextStyle(fontFamily: 'Poppins')),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text("Stay", style: TextStyle(color: Colors.grey))),
-          Padding(
-            padding: const EdgeInsets.only(right: 8, bottom: 8),
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, elevation: 0, shape: const StadiumBorder()),
-              onPressed: () => Navigator.of(context).popUntil((route) => route.isFirst),
-              child: const Text("Sign Out", style: TextStyle(color: Colors.white)),
-            ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, shape: const StadiumBorder()),
+            onPressed: () async {
+              await FirebaseAuth.instance.signOut();
+              // Redirect to Login/Onboarding screen and clear stack
+              if (mounted) {
+                Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+              }
+            },
+            child: const Text("Sign Out", style: TextStyle(color: Colors.white)),
           ),
         ],
       ),

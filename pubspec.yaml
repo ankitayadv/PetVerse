@@ -75,6 +75,15 @@ flutter:
     - assets/images/best.jpeg
     - assets/images/diet.jpg
     - assets/images/hydration.jpeg
+    - assets/images/labrador.jpeg
+    - assets/images/bull_dog.jpeg
+    - assets/images/Golden_Retriever.jpeg
+    - assets/images/sammy.jpeg
+    - assets/images/sheru.jpeg
+
+
+
+    
 
   fonts:
     - family: Poppins

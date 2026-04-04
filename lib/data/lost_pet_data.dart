@@ -15,7 +15,7 @@ class LostPetData {
       "breed": "Golden Retriever",
       "color": "Golden",
       "time": "2h ago",
-      "image": "assets/images/pet_profile.png",
+      "image": "assets/images/Golden_Retriever.jpeg",
     },
 
     {
@@ -27,7 +27,7 @@ class LostPetData {
       "lng": 77.3910,
       "color": "white-brown",
       "time": "5h ago",
-      "image": "assets/images/pet_profile.png",
+      "image": "assets/images/labrador.jpeg",
     },
 
     {
@@ -39,7 +39,31 @@ class LostPetData {
       "breed": "Bulldog",
       "color": "Brindle",
       "time": "1d ago",
-      "image": "assets/images/pet_profile.png",
+      "image": "assets/images/bull_dog.jpeg",
+    },
+
+    {
+      "name": "sheru",
+      "type": "FOUND",
+      "location": "Delhi",
+      "lat": 29.4595,
+      "lng": 76.0266,
+      "breed": "Golden Retriever",
+      "color": "Golden",
+      "time": "1d ago",
+      "image": "assets/images/sheru.jpeg",
+    },
+
+    {
+      "name": "SAMMY",
+      "type": "FOUND",
+      "location": "delhi",
+      "lat": 23.4595,
+      "lng": 37.0266,
+      "breed": "Golden Retriever",
+      "color": "Golden",
+      "time": "2d ago",
+      "image": "assets/images/sammy.jpeg",
     },
   ];
 

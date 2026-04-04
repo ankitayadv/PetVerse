@@ -5,7 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 
 import '../data/lost_pet_data.dart';
-import '../routes/app_routes.dart'; // ✅ ADDED
+import '../routes/app_routes.dart';
 
 class ReportLostScreen extends StatefulWidget {
   const ReportLostScreen({super.key});
@@ -29,6 +29,8 @@ class _ReportLostScreenState extends State<ReportLostScreen> {
   double? lat;
   double? lng;
 
+  bool isSubmitting = false; // 🔥 FIX
+
   final ImagePicker picker = ImagePicker();
 
   // 📸 IMAGE PICK
@@ -43,53 +45,69 @@ class _ReportLostScreenState extends State<ReportLostScreen> {
 
   // 📍 LOCATION FETCH
   Future<void> fetchLocation() async {
-    Position position = await Geolocator.getCurrentPosition();
+    try {
+      LocationPermission permission = await Geolocator.requestPermission();
 
-    lat = position.latitude;
-    lng = position.longitude;
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        return;
+      }
 
-    List<Placemark> placemarks =
-        await placemarkFromCoordinates(lat!, lng!);
+      Position position = await Geolocator.getCurrentPosition();
 
-    final place = placemarks.first;
+      lat = position.latitude;
+      lng = position.longitude;
 
-    String address =
-        "${place.subLocality}, ${place.locality}, ${place.administrativeArea}";
+      List<Placemark> placemarks =
+          await placemarkFromCoordinates(lat!, lng!);
 
-    setState(() {
-      locationController.text = address;
-    });
+      final place = placemarks.first;
+
+      String address =
+          "${place.subLocality}, ${place.locality}, ${place.administrativeArea}";
+
+      setState(() {
+        locationController.text = address;
+      });
+    } catch (e) {
+      debugPrint("Location error: $e");
+    }
   }
 
-  // 🚀 SUBMIT (UPDATED WITH AI FLOW)
-  void submitForm() {
-    if (_formKey.currentState!.validate()) {
-      
-      final petData = {
-        "name": nameController.text,
-        "type": "LOST",
-        "location": locationController.text,
-        "lat": lat ?? 28.6139,
-        "lng": lng ?? 77.2090,
-        "breed": breedController.text,
-        "color": colorController.text,
-        "time": "Just now",
-        "image": images.isNotEmpty
-            ? images.first.path
-            : "assets/images/pet_profile.png",
-        "phone": phoneController.text,
-      };
+  // 🚀 SUBMIT
+  void submitForm() async {
+    FocusScope.of(context).unfocus(); // 🔥 keyboard close
 
-      // ✅ SAVE LOCALLY (FOR NEARBY + MAP)
-      LostPetData.addPet(petData);
+    if (!_formKey.currentState!.validate()) return;
 
-      // ✅ GO TO AI MATCHING SCREEN
-      Navigator.pushNamed(
-        context,
-        AppRoutes.aiMatch,
-        arguments: petData,
-      );
-    }
+    if (isSubmitting) return; // 🔥 prevent double click
+
+    setState(() => isSubmitting = true);
+
+    final petData = {
+      "name": nameController.text.trim(),
+      "type": "LOST",
+      "location": locationController.text.trim(),
+      "lat": lat ?? 28.6139,
+      "lng": lng ?? 77.2090,
+      "breed": breedController.text.trim(),
+      "color": colorController.text.trim(),
+      "time": "Just now",
+      "image": images.isNotEmpty
+          ? images.first.path
+          : "assets/images/pet_profile.png",
+      "phone": phoneController.text.trim(),
+    };
+
+    LostPetData.addPet(petData);
+
+    setState(() => isSubmitting = false);
+
+    Navigator.pushNamed(
+      context,
+      AppRoutes.aiMatch,
+      arguments: petData,
+    );
   }
 
   @override
@@ -107,117 +125,156 @@ class _ReportLostScreenState extends State<ReportLostScreen> {
         child: Column(
           children: [
 
+            // 🔥 FORM START (FIXED)
             Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
+              child: Form(
+                key: _formKey,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
 
-                    // 🔥 IMAGE CARD
-                    _card(
-                      child: Column(
-                        children: [
-                          const Text(
-                            "Pet Images",
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold, fontSize: 16),
-                          ),
-                          const SizedBox(height: 10),
-
-                          Wrap(
-                            spacing: 10,
-                            children: images
-                                .map((img) => ClipRRect(
-                                      borderRadius:
-                                          BorderRadius.circular(12),
-                                      child: Image.file(
-                                        img,
-                                        height: 75,
-                                        width: 75,
-                                        fit: BoxFit.cover,
-                                      ),
-                                    ))
-                                .toList(),
-                          ),
-
-                          const SizedBox(height: 12),
-
-                          Row(
-                            mainAxisAlignment:
-                                MainAxisAlignment.spaceEvenly,
-                            children: [
-                              _imgButton(
-                                  "Camera", Icons.camera,
-                                  () => pickImage(ImageSource.camera)),
-                              _imgButton(
-                                  "Gallery", Icons.photo,
-                                  () => pickImage(ImageSource.gallery)),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // 🔥 PET DETAILS
-                    _card(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text("Pet Details",
+                      // 🔥 IMAGE CARD
+                      _card(
+                        child: Column(
+                          children: [
+                            const Text(
+                              "Pet Images",
                               style: TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 16)),
+                                  fontSize: 16),
+                            ),
+                            const SizedBox(height: 10),
 
-                          const SizedBox(height: 10),
+                            Wrap(
+                              spacing: 10,
+                              children: images
+                                  .map((img) => ClipRRect(
+                                        borderRadius:
+                                            BorderRadius.circular(12),
+                                        child: Image.file(
+                                          img,
+                                          height: 75,
+                                          width: 75,
+                                          fit: BoxFit.cover,
+                                        ),
+                                      ))
+                                  .toList(),
+                            ),
 
-                          _input("Pet Name", nameController),
-                          _input("Breed", breedController),
-                          _input("Color", colorController),
+                            const SizedBox(height: 12),
 
-                          TextFormField(
-                            controller: locationController,
-                            decoration: InputDecoration(
-                              labelText: "Last Seen Location",
-                              filled: true,
-                              fillColor: Colors.white,
-                              border: OutlineInputBorder(
-                                borderRadius:
-                                    BorderRadius.circular(15),
-                              ),
-                              suffixIcon: IconButton(
-                                icon: const Icon(Icons.my_location),
-                                onPressed: fetchLocation,
+                            Row(
+                              mainAxisAlignment:
+                                  MainAxisAlignment.spaceEvenly,
+                              children: [
+                                _imgButton(
+                                    "Camera",
+                                    Icons.camera,
+                                    () => pickImage(
+                                        ImageSource.camera)),
+                                _imgButton(
+                                    "Gallery",
+                                    Icons.photo,
+                                    () => pickImage(
+                                        ImageSource.gallery)),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // 🔥 PET DETAILS
+                      _card(
+                        child: Column(
+                          crossAxisAlignment:
+                              CrossAxisAlignment.start,
+                          children: [
+                            const Text("Pet Details",
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16)),
+
+                            const SizedBox(height: 10),
+
+                            _input("Pet Name", nameController),
+                            _input("Breed", breedController),
+                            _input("Color", colorController),
+
+                            TextFormField(
+                              controller: locationController,
+                              validator: (val) =>
+                                  val == null || val.isEmpty
+                                      ? "Required"
+                                      : null,
+                              decoration: InputDecoration(
+                                labelText: "Last Seen Location",
+                                filled: true,
+                                fillColor: Colors.white,
+                                border: OutlineInputBorder(
+                                  borderRadius:
+                                      BorderRadius.circular(15),
+                                ),
+                                suffixIcon: IconButton(
+                                  icon:
+                                      const Icon(Icons.my_location),
+                                  onPressed: fetchLocation,
+                                ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
 
-                    const SizedBox(height: 16),
+                      const SizedBox(height: 16),
 
-                    // 🔥 OWNER DETAILS
-                    _card(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text("Owner Details",
-                              style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16)),
+                      // 🔥 OWNER DETAILS
+                      _card(
+                        child: Column(
+                          crossAxisAlignment:
+                              CrossAxisAlignment.start,
+                          children: [
+                            const Text("Owner Details",
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16)),
 
-                          const SizedBox(height: 10),
+                            const SizedBox(height: 10),
 
-                          _input("Owner Name", ownerController),
-                          _input("Phone Number", phoneController),
-                        ],
+                            _input("Owner Name", ownerController),
+
+                            // 🔥 IMPROVED PHONE FIELD
+                            TextFormField(
+                              controller: phoneController,
+                              keyboardType: TextInputType.phone,
+                              validator: (val) {
+                                if (val == null || val.isEmpty) {
+                                  return "Required";
+                                }
+                                if (val.length < 10) {
+                                  return "Invalid number";
+                                }
+                                return null;
+                              },
+                              decoration: InputDecoration(
+                                labelText: "Phone Number",
+                                filled: true,
+                                fillColor: Colors.white,
+                                border: OutlineInputBorder(
+                                  borderRadius:
+                                      BorderRadius.circular(15),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
 
-                    const SizedBox(height: 80),
-                  ],
+                      const SizedBox(height: 80),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -235,18 +292,24 @@ class _ReportLostScreenState extends State<ReportLostScreen> {
                 ],
               ),
               child: ElevatedButton(
-                onPressed: submitForm,
+                onPressed: isSubmitting ? null : submitForm,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.orange,
-                  minimumSize: const Size(double.infinity, 55),
+                  minimumSize:
+                      const Size(double.infinity, 55),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(15),
+                    borderRadius:
+                        BorderRadius.circular(15),
                   ),
                 ),
-                child: const Text(
-                  "Submit Report",
-                  style: TextStyle(fontSize: 16),
-                ),
+                child: isSubmitting
+                    ? const CircularProgressIndicator(
+                        color: Colors.white,
+                      )
+                    : const Text(
+                        "Submit Report",
+                        style: TextStyle(fontSize: 16),
+                      ),
               ),
             )
           ],
@@ -296,7 +359,8 @@ class _ReportLostScreenState extends State<ReportLostScreen> {
     );
   }
 
-  Widget _imgButton(String text, IconData icon, VoidCallback onTap) {
+  Widget _imgButton(
+      String text, IconData icon, VoidCallback onTap) {
     return ElevatedButton.icon(
       onPressed: onTap,
       icon: Icon(icon),

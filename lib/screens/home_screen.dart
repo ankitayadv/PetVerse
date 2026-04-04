@@ -1,11 +1,14 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../routes/app_routes.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -37,12 +40,16 @@ class _HomeScreenState extends State<HomeScreen> {
   Timer? _timer;
   StreamSubscription<Position>? _positionStream;
 
+  // Firebase Real-time Data
+  Map<String, dynamic>? _liveUserData;
+  StreamSubscription<DocumentSnapshot>? _userSubscription;
+
   @override
   void initState() {
     super.initState();
-    // Initializing with provided location or default
     location = widget.ownerLocation.isNotEmpty ? widget.ownerLocation : "Fetching...";
     _initLocationService();
+    _initFirebaseListener();
 
     _timer = Timer.periodic(const Duration(seconds: 5), (timer) {
       if (_infoController.hasClients && infoCards.isNotEmpty) {
@@ -56,10 +63,29 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  // --- FIREBASE LISTENER ---
+  void _initFirebaseListener() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      _userSubscription = FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .snapshots()
+          .listen((snapshot) {
+        if (snapshot.exists && mounted) {
+          setState(() {
+            _liveUserData = snapshot.data();
+          });
+        }
+      });
+    }
+  }
+
   @override
   void dispose() {
     _timer?.cancel();
     _positionStream?.cancel();
+    _userSubscription?.cancel();
     _infoController.dispose();
     super.dispose();
   }
@@ -72,19 +98,15 @@ class _HomeScreenState extends State<HomeScreen> {
     return mobileSize;
   }
 
-  // --- REPAIRED LIVE GPS LOGIC ---
+  // --- LOCATION LOGIC ---
   Future<void> _initLocationService() async {
-    bool serviceEnabled;
-    LocationPermission permission;
-
-    // Check if services are enabled
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
       if (mounted) setState(() => location = widget.ownerLocation);
       return;
     }
 
-    permission = await Geolocator.checkPermission();
+    LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
@@ -93,37 +115,18 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     }
 
-    if (permission == LocationPermission.deniedForever) {
-      if (mounted) setState(() => location = widget.ownerLocation);
-      return;
-    }
-
     try {
-      // Get initial position safely
       Position position = await Geolocator.getCurrentPosition(
           desiredAccuracy: LocationAccuracy.high,
           timeLimit: const Duration(seconds: 5));
       _updateAddress(position);
-
-      // Listen for changes
-      _positionStream = Geolocator.getPositionStream(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          distanceFilter: 100, // Update every 100 meters to save battery
-        ),
-      ).listen((Position position) {
-        _updateAddress(position);
-      }, onError: (e) => debugPrint("Location Stream Error: $e"));
-      
     } catch (e) {
-      debugPrint("Location service error: $e");
       if (mounted) setState(() => location = widget.ownerLocation);
     }
   }
 
   Future<void> _updateAddress(Position pos) async {
     try {
-      // Note: Geocoding might have issues on Web depending on API setup
       List<Placemark> placemarks = await placemarkFromCoordinates(pos.latitude, pos.longitude);
       if (mounted && placemarks.isNotEmpty) {
         setState(() {
@@ -131,35 +134,47 @@ class _HomeScreenState extends State<HomeScreen> {
           location = "${place.subLocality ?? place.locality ?? 'Nearby'}, ${place.administrativeArea ?? ''}";
         });
       }
-    } catch (e) {
-      debugPrint("Geocoding error: $e");
-    }
+    } catch (e) {}
   }
 
-  String getGreeting() {
-    final hour = DateTime.now().hour;
-    if (hour >= 5 && hour < 12) return "Good Morning";
-    if (hour >= 12 && hour < 17) return "Good Afternoon";
-    return "Good Evening";
-  }
-
+  // --- IMAGE HELPERS ---
   ImageProvider _getProfileImage(dynamic imageSource) {
     const defaultImg = NetworkImage("https://cdn-icons-png.flaticon.com/512/149/149071.png");
+    
+    // Check Firestore for 'ownerImageBase64' (from Step 2)
+    final liveBase64 = _liveUserData?['ownerImageBase64'];
+    if (liveBase64 != null && liveBase64.toString().isNotEmpty) {
+      return MemoryImage(base64Decode(liveBase64));
+    }
+
     if (imageSource == null) return defaultImg;
+
     try {
-      if (imageSource is Uint8List) return MemoryImage(imageSource);
-      if (imageSource is File) return FileImage(imageSource);
       if (imageSource is String) {
         if (imageSource.startsWith('http')) return NetworkImage(imageSource);
+        if (imageSource.length > 100) return MemoryImage(base64Decode(imageSource));
         return FileImage(File(imageSource));
       }
+      if (imageSource is Uint8List) return MemoryImage(imageSource);
+      if (imageSource is File) return FileImage(imageSource);
     } catch (e) {
       return defaultImg;
     }
     return defaultImg;
   }
 
+  Widget _buildPetImage(Map<String, dynamic> pet) {
+    final String? base64Str = pet['imageBase64'];
+    if (base64Str != null && base64Str.isNotEmpty) {
+      return Image.memory(base64Decode(base64Str), fit: BoxFit.cover, 
+          errorBuilder: (_, __, ___) => const Icon(Icons.pets, color: Colors.orange));
+    }
+    return Image.asset("assets/images/pet_profile.png", fit: BoxFit.cover);
+  }
+
   void _showPetSwitcher() {
+    final List<dynamic> allPets = _liveUserData?['allPets'] ?? widget.allPets;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -180,22 +195,21 @@ class _HomeScreenState extends State<HomeScreen> {
             Flexible(
               child: ListView.builder(
                 shrinkWrap: true,
-                itemCount: widget.allPets.length,
+                itemCount: allPets.length,
                 itemBuilder: (context, index) {
-                  final pet = widget.allPets[index];
-                  bool isCurrent = (widget.selectedPet['name'] ?? "") == (pet['name'] ?? "");
+                  final pet = Map<String, dynamic>.from(allPets[index]);
                   return ListTile(
                     leading: CircleAvatar(
                       backgroundColor: Colors.orange.shade100,
-                      backgroundImage: pet['image'] != null 
-                          ? (kIsWeb ? NetworkImage(pet['image'].path) : FileImage(File(pet['image'].path)) as ImageProvider)
-                          : null,
-                      child: pet['image'] == null ? const Icon(Icons.pets, color: Colors.orange) : null,
+                      backgroundImage: pet['imageBase64'] != null ? MemoryImage(base64Decode(pet['imageBase64'])) : null,
+                      child: pet['imageBase64'] == null ? const Icon(Icons.pets, color: Colors.orange) : null,
                     ),
-                    title: Text(pet['name'] ?? "Unnamed Pet", style: TextStyle(fontFamily: 'Poppins', fontSize: _responsiveSize(16), fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal)),
-                    subtitle: Text("${pet['type'] ?? 'Pet'} • ${pet['breed'] ?? 'Mixed'}", style: TextStyle(fontFamily: 'Poppins', fontSize: _responsiveSize(13))),
-                    trailing: isCurrent ? const Icon(Icons.check_circle, color: Colors.orange) : null,
-                    onTap: () {
+                    title: Text(pet['name'] ?? "Pet"),
+                    onTap: () async {
+                      final user = FirebaseAuth.instance.currentUser;
+                      if (user != null) {
+                        await FirebaseFirestore.instance.collection('users').doc(user.uid).update({'selectedPet': pet});
+                      }
                       widget.onPetSwitched(pet);
                       Navigator.pop(context);
                     },
@@ -203,13 +217,13 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
               ),
             ),
-            const SizedBox(height: 20),
           ],
         ),
       ),
     );
   }
 
+  // --- DATA ---
   final List<Map<String, String>> infoCards = [
     {"text": "Stay on top of your pet’s health 🐾", "image": "assets/images/onboarding_page2.png"},
     {"text": "Never miss vaccines & routines 💉", "image": "assets/images/onboarding_page2.png"},
@@ -245,10 +259,24 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  String getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good Morning';
+    if (hour < 17) return 'Good Afternoon';
+    return 'Good Evening';
+  }
+
   @override
   Widget build(BuildContext context) {
     final active = notifications.where((e) => e["done"] == false).toList();
-    final pet = widget.selectedPet;
+    
+    // Priority: Firestore 'ownerName' -> Firestore 'fullName' -> widget prop
+    final String currentOwnerName = _liveUserData?['ownerName'] ?? 
+                                   (_liveUserData?['fullName'] ?? widget.ownerName);
+    
+    final Map<String, dynamic> pet = _liveUserData?['selectedPet'] != null 
+        ? Map<String, dynamic>.from(_liveUserData!['selectedPet']) 
+        : widget.selectedPet;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -258,7 +286,7 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // --- UPDATED HEADER SECTION (Removed Home Icon) ---
+              // --- HEADER ---
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -279,22 +307,15 @@ class _HomeScreenState extends State<HomeScreen> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            "Welcome back, ${widget.ownerName}", 
-                            style: TextStyle(fontFamily: 'Poppins', color: Colors.grey.shade600, fontSize: _responsiveSize(14))
-                          ),
-                          Text(
-                            getGreeting(), 
-                            style: TextStyle(fontFamily: 'Poppins', fontSize: _responsiveSize(26), fontWeight: FontWeight.bold, letterSpacing: -0.5)
-                          ),
+                          Text("Welcome back, $currentOwnerName", 
+                              style: TextStyle(fontFamily: 'Poppins', color: Colors.grey.shade600, fontSize: _responsiveSize(14))),
+                          Text(getGreeting(), 
+                              style: TextStyle(fontFamily: 'Poppins', fontSize: _responsiveSize(26), fontWeight: FontWeight.bold)),
                         ],
                       ),
                     ],
                   ),
-                  // Only Notification Icon remains here
-                  _headerActionButton(Icons.notifications_none_rounded, () {
-                    // Notification action
-                  }),
+                  _headerActionButton(Icons.notifications_none_rounded, () {}),
                 ],
               ),
               const SizedBox(height: 10),
@@ -306,7 +327,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
               const SizedBox(height: 30),
 
-              // --- PET PROFILE SECTION ---
+              // --- PET CARD ---
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
@@ -317,32 +338,16 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 child: Row(
                   children: [
-                    Container(
-                      height: 70, width: 70,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: Colors.orange.withOpacity(0.4)),
-                        color: Colors.orange.shade50,
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(20),
-                        child: pet['image'] != null
-                            ? (kIsWeb 
-                                ? Image.network(pet['image'].path, fit: BoxFit.cover, errorBuilder: (_, _, _) => const Icon(Icons.pets, color: Colors.orange)) 
-                                : Image.file(File(pet['image'].path), fit: BoxFit.cover, errorBuilder: (_, _, _) => const Icon(Icons.pets, color: Colors.orange)))
-                            : Image.asset("assets/images/pet_profile.png", fit: BoxFit.cover),
-                      ),
-                    ),
+                    ClipRRect(borderRadius: BorderRadius.circular(20), 
+                        child: SizedBox(height: 70, width: 70, child: _buildPetImage(pet))),
                     const SizedBox(width: 14),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(pet['name'] ?? 'Pet', style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.bold, fontSize: _responsiveSize(18))),
-                          Text(
-                            "${pet['type'] ?? 'Unknown'} • ${pet['breed'] ?? 'Family'}",
-                            style: TextStyle(fontFamily: 'Poppins', color: Colors.orange.shade800, fontSize: _responsiveSize(13), fontWeight: FontWeight.w500),
-                          ),
+                          Text(pet['name'] ?? 'My Pet', style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.bold, fontSize: _responsiveSize(18))),
+                          Text("${pet['type'] ?? 'Pet'} • ${pet['breed'] ?? 'Mixed'}", 
+                              style: TextStyle(fontFamily: 'Poppins', color: Colors.orange.shade800, fontSize: _responsiveSize(13), fontWeight: FontWeight.w500)),
                         ],
                       ),
                     ),
@@ -374,11 +379,10 @@ class _HomeScreenState extends State<HomeScreen> {
                         borderRadius: BorderRadius.circular(22),
                         gradient: const LinearGradient(colors: [Color(0xFFFFF8F2), Color(0xFFFFEAD7)]),
                         border: Border.all(color: Colors.orange.withOpacity(0.2)),
-                        boxShadow: [BoxShadow(color: Colors.orange.withOpacity(0.1), blurRadius: 15, offset: const Offset(0, 8))],
                       ),
                       child: Row(
                         children: [
-                          Image.asset(infoCards[i]["image"]!, height: 75, errorBuilder: (_, _, _) => const Icon(Icons.info_outline)),
+                          Image.asset(infoCards[i]["image"]!, height: 75),
                           const SizedBox(width: 14),
                           Expanded(child: Text(infoCards[i]["text"]!, style: TextStyle(fontFamily: 'Poppins', fontSize: _responsiveSize(15), fontWeight: FontWeight.w500))),
                         ],
@@ -390,7 +394,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
               const SizedBox(height: 25),
 
-              // --- FEATURE GRID ---
+              // --- GRID ---
               GridView.count(
                 shrinkWrap: true,
                 crossAxisCount: 3,
@@ -408,24 +412,19 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
 
               const SizedBox(height: 30),
-
               Text("Today’s Upcoming Tasks", style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.bold, fontSize: _responsiveSize(18))),
               const SizedBox(height: 16),
 
-              // --- TASK LIST ---
+              // --- TASKS ---
               Column(
                 children: active.map((item) {
                   return Container(
                     margin: const EdgeInsets.only(bottom: 14),
                     padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: getColor(item["type"]),
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 4))],
-                    ),
+                    decoration: BoxDecoration(color: getColor(item["type"]), borderRadius: BorderRadius.circular(20)),
                     child: Row(
                       children: [
-                        Image.asset(getImage(item["type"]), height: 35, errorBuilder: (_, _, _) => const Icon(Icons.task_alt)),
+                        Image.asset(getImage(item["type"]), height: 35),
                         const SizedBox(width: 14),
                         Expanded(
                           child: Column(
@@ -438,8 +437,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         GestureDetector(
                           onTap: () { setState(() { item["done"] = !item["done"]; }); },
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
+                          child: Container(
                             height: 28, width: 28,
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(10),
@@ -463,14 +461,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _headerActionButton(IconData icon, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(50),
-      child: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(color: Colors.grey.shade100, shape: BoxShape.circle),
-        child: Icon(icon, color: Colors.black87, size: 24),
-      ),
+    return Container(
+      decoration: BoxDecoration(color: Colors.grey.shade100, shape: BoxShape.circle),
+      child: IconButton(icon: Icon(icon, color: Colors.black87), onPressed: onTap),
     );
   }
 
@@ -480,7 +473,7 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(24),
-          boxShadow: [BoxShadow(color: color.withOpacity(0.2), blurRadius: 15, offset: const Offset(0, 8))],
+          boxShadow: [BoxShadow(color: color.withOpacity(0.2), blurRadius: 10)]
         ),
         child: Column(
           children: [
@@ -489,29 +482,17 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Container(
                 decoration: BoxDecoration(
                   color: color.withOpacity(0.6),
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(24))
                 ),
-                child: Center(child: Image.asset(image, height: 60, errorBuilder: (_, _, _) => const Icon(Icons.category, color: Colors.white))),
-              ),
+                child: Center(child: Image.asset(image, height: 45))
+              )
             ),
             Expanded(
               flex: 2,
               child: Container(
                 width: double.infinity,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFF9F9F9),
-                  borderRadius: BorderRadius.vertical(bottom: Radius.circular(24)),
-                ),
-                child: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: Text(
-                      title, 
-                      textAlign: TextAlign.center, 
-                      style: TextStyle(fontFamily: 'Poppins', fontSize: _responsiveSize(12), fontWeight: FontWeight.w600)
-                    ),
-                  ),
-                ),
+                decoration: const BoxDecoration(color: Color(0xFFF9F9F9), borderRadius: BorderRadius.vertical(bottom: Radius.circular(24))),
+                child: Center(child: Text(title, textAlign: TextAlign.center, style: TextStyle(fontFamily: 'Poppins', fontSize: _responsiveSize(10), fontWeight: FontWeight.bold)))
               ),
             ),
           ],
