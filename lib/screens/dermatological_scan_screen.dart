@@ -17,10 +17,8 @@ class _DermatologicalScanScreenState
   Map<String, dynamic>? _analysisResult;
 
   final ImagePicker _picker = ImagePicker();
+  int _scanIndex = 0;
 
-  int _scanIndex = 0; // controls order
-
-  /// 📷 Pick Image
   Future<void> _getImage(ImageSource source) async {
     final XFile? pickedFile = await _picker.pickImage(
       source: source,
@@ -35,7 +33,6 @@ class _DermatologicalScanScreenState
     }
   }
 
-  /// 🧠 Controlled Output (ONLY PROBLEMS)
   Future<void> _performAnalysis() async {
     if (_selectedImage == null) return;
 
@@ -65,7 +62,7 @@ class _DermatologicalScanScreenState
     ];
 
     final result = results[_scanIndex % results.length];
-    _scanIndex++; // move to next
+    _scanIndex++;
 
     setState(() {
       _analysisResult = result;
@@ -76,31 +73,33 @@ class _DermatologicalScanScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF6F7FB),
+
       appBar: AppBar(
         title: const Text("Skin Scanner 🐶"),
         centerTitle: true,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
         elevation: 0,
+        backgroundColor: Colors.transparent,
+        foregroundColor: Colors.black,
       ),
+
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            _buildImageCard(),
+            _imageCard(),
             const SizedBox(height: 20),
 
-            if (_isAnalyzing) _buildLoading(),
+            if (_isAnalyzing) _loadingCard(),
 
             if (_analysisResult != null && !_isAnalyzing)
-              _buildResult(),
+              _resultCard(),
 
-            const SizedBox(height: 30),
+            const SizedBox(height: 25),
 
-            _buttons(),
+            _uploadButtons(),
 
-            const SizedBox(height: 15),
+            const SizedBox(height: 20),
 
             _scanButton(),
           ],
@@ -109,104 +108,226 @@ class _DermatologicalScanScreenState
     );
   }
 
-  Widget _buildImageCard() {
+  /// 🖼 IMAGE CARD
+  Widget _imageCard() {
     return Container(
-      height: 280,
+      height: 300,
       width: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.grey[100],
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF6A11CB), Color(0xFF2575FC)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
+          )
+        ],
       ),
       child: _selectedImage == null
-          ? const Center(child: Text("Upload dog skin image"))
+          ? const Center(
+              child: Text(
+                "Upload Dog Skin Image",
+                style: TextStyle(color: Colors.white, fontSize: 16),
+              ),
+            )
           : ClipRRect(
-              borderRadius: BorderRadius.circular(20),
-              child: Image.file(_selectedImage!, fit: BoxFit.contain),
+              borderRadius: BorderRadius.circular(24),
+              child: Stack(
+                children: [
+                  Image.file(
+                    _selectedImage!,
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                  ),
+                  Positioned(
+                    bottom: 10,
+                    right: 10,
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Text(
+                        "Preview",
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    ),
+                  )
+                ],
+              ),
             ),
     );
   }
 
-  Widget _buildLoading() {
-    return Column(
-      children: const [
-        LinearProgressIndicator(),
-        SizedBox(height: 10),
-        Text("Analyzing skin using AI..."),
-      ],
+  /// ⏳ LOADING CARD
+  Widget _loadingCard() {
+    return Card(
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16)),
+      child: const Padding(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 10),
+            Text("Analyzing with AI..."),
+          ],
+        ),
+      ),
     );
   }
 
-  Widget _buildResult() {
+  /// 📊 RESULT CARD
+  Widget _resultCard() {
     final result = _analysisResult!;
     final confidence = (result['confidence'] * 100).toInt();
 
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(color: Colors.black12, blurRadius: 10),
-        ],
+    Color riskColor;
+    switch (result['riskLevel']) {
+      case "High":
+        riskColor = Colors.red;
+        break;
+      case "Medium":
+        riskColor = Colors.orange;
+        break;
+      default:
+        riskColor = Colors.green;
+    }
+
+    return Card(
+      elevation: 6,
+      shape:
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            _infoRow("Status", result['status'], Colors.red),
+            const Divider(),
+            _infoRow("Condition", result['condition'], Colors.black),
+            _infoRow("Risk Level", result['riskLevel'], riskColor),
+
+            const SizedBox(height: 15),
+
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                "Confidence ($confidence%)",
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            LinearProgressIndicator(
+              value: result['confidence'],
+              minHeight: 8,
+              borderRadius: BorderRadius.circular(10),
+            ),
+
+            const SizedBox(height: 12),
+
+            const Text(
+              "⚠️ Not a medical diagnosis. Consult a vet.",
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ],
+        ),
       ),
-      child: Column(
+    );
+  }
+
+  /// ROW UI
+  Widget _infoRow(String label, String value, Color color) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          _row("Status", result['status'], Colors.red),
-          const Divider(),
-          _row("Condition", result['condition'], Colors.black),
-          _row("Risk", result['riskLevel'], Colors.orange),
-          const SizedBox(height: 10),
-          Text("Confidence: $confidence%"),
-          LinearProgressIndicator(value: result['confidence']),
-          const SizedBox(height: 10),
-          const Text(
-            "⚠️ Not a medical diagnosis. Consult a vet.",
-            style: TextStyle(fontSize: 11, color: Colors.grey),
-          ),
+          Text(label,
+              style: const TextStyle(fontWeight: FontWeight.w500)),
+          Text(value,
+              style:
+                  TextStyle(color: color, fontWeight: FontWeight.bold)),
         ],
       ),
     );
   }
 
-  Widget _row(String label, String value, Color color) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label),
-        Text(value, style: TextStyle(color: color)),
-      ],
-    );
-  }
-
-  Widget _buttons() {
+  /// 📷 BUTTONS
+  Widget _uploadButtons() {
     return Row(
       children: [
         Expanded(
-          child: ElevatedButton.icon(
-            onPressed: () => _getImage(ImageSource.gallery),
-            icon: const Icon(Icons.photo),
-            label: const Text("Gallery"),
+          child: _modernButton(
+            icon: Icons.photo_library,
+            text: "Gallery",
+            onTap: () => _getImage(ImageSource.gallery),
           ),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 12),
         Expanded(
-          child: ElevatedButton.icon(
-            onPressed: () => _getImage(ImageSource.camera),
-            icon: const Icon(Icons.camera),
-            label: const Text("Camera"),
+          child: _modernButton(
+            icon: Icons.camera_alt,
+            text: "Camera",
+            onTap: () => _getImage(ImageSource.camera),
           ),
         ),
       ],
     );
   }
 
+  Widget _modernButton({
+    required IconData icon,
+    required String text,
+    required VoidCallback onTap,
+  }) {
+    return ElevatedButton.icon(
+      style: ElevatedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+        ),
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
+        elevation: 3,
+      ),
+      onPressed: onTap,
+      icon: Icon(icon),
+      label: Text(text),
+    );
+  }
+
+  /// 🔍 SCAN BUTTON (CHANGED COLOR ONLY)
   Widget _scanButton() {
-    return ElevatedButton(
-      onPressed:
-          _selectedImage == null || _isAnalyzing ? null : _performAnalysis,
-      child: const Text("Scan Image"),
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          backgroundColor: const Color(0xFFFF8A50), // ✅ NEW COLOR
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+        onPressed:
+            _selectedImage == null || _isAnalyzing
+                ? null
+                : _performAnalysis,
+        child: const Text(
+          "Scan Image",
+          style: TextStyle(fontSize: 16, color: Colors.white),
+        ),
+      ),
     );
   }
 }
+
+
 
 

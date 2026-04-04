@@ -59,7 +59,7 @@ class _RoutineScreenState extends State<RoutineScreen> {
         title: const Text(
           "Routines",
           style: TextStyle(
-            color: Color(0xFF333842), // ✅ FIXED
+            color: Color(0xFF333842),
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -123,7 +123,7 @@ class _RoutineScreenState extends State<RoutineScreen> {
         ),
         if (active)
           Container(
-            margin: const EdgeInsets.only(top: 4), // ✅ FIXED
+            margin: const EdgeInsets.only(top: 4),
             height: 2,
             width: 40,
             color: Colors.orange,
@@ -172,11 +172,13 @@ class _RoutineScreenState extends State<RoutineScreen> {
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(item['time'], style: const TextStyle(color: Colors.black54)),
+                Text(item['time'],
+                    style: const TextStyle(color: Colors.black54)),
                 if (item.containsKey('subtitle'))
                   Text(
                     item['subtitle'],
-                    style: const TextStyle(color: Colors.grey, fontSize: 12),
+                    style:
+                        const TextStyle(color: Colors.grey, fontSize: 12),
                   ),
               ],
             ),
@@ -188,15 +190,18 @@ class _RoutineScreenState extends State<RoutineScreen> {
           ),
 
           Padding(
-            padding: const EdgeInsets.only(bottom: 12, left: 16, right: 16),
+            padding:
+                const EdgeInsets.only(bottom: 12, left: 16, right: 16),
             child: Row(
               children: [
                 Expanded(
-                  child: _actionButton("Edit", () => _editRoutineDialog(index)),
+                  child: _actionButton(
+                      "Edit", () => _editRoutineDialog(index)),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: _actionButton("Edit", () => _editRoutineDialog(index)),
+                  child: _actionButton(
+                      "Delete", () => _confirmDelete(index)),
                 ),
               ],
             ),
@@ -218,8 +223,8 @@ class _RoutineScreenState extends State<RoutineScreen> {
         alignment: Alignment.center,
         child: Text(
           label,
-          style: const TextStyle(
-            color: Colors.blueAccent,
+          style: TextStyle(
+            color: label == "Delete" ? Colors.red : Colors.blueAccent,
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -260,8 +265,8 @@ class _RoutineScreenState extends State<RoutineScreen> {
   }
 
   void _showRoutineDialog(int? index) {
-    TextEditingController titleController =
-        TextEditingController(text: index != null ? routines[index]['title'] : "");
+    TextEditingController titleController = TextEditingController(
+        text: index != null ? routines[index]['title'] : "");
 
     showDialog(
       context: context,
@@ -269,7 +274,8 @@ class _RoutineScreenState extends State<RoutineScreen> {
         title: Text(index == null ? "Add Routine" : "Edit Routine"),
         content: TextField(
           controller: titleController,
-          decoration: const InputDecoration(hintText: "Routine Name"),
+          decoration:
+              const InputDecoration(hintText: "Routine Name"),
         ),
         actions: [
           TextButton(
@@ -289,7 +295,8 @@ class _RoutineScreenState extends State<RoutineScreen> {
                     "iconColor": Colors.blue,
                   });
                 } else {
-                  routines[index]['title'] = titleController.text;
+                  routines[index]['title'] =
+                      titleController.text;
                 }
               });
               Navigator.pop(context);
@@ -300,5 +307,34 @@ class _RoutineScreenState extends State<RoutineScreen> {
       ),
     );
   }
+
+  void _confirmDelete(int index) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Delete Routine"),
+        content:
+            const Text("Are you sure you want to delete this routine?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red),
+            onPressed: () {
+              setState(() {
+                routines.removeAt(index);
+              });
+              Navigator.pop(context);
+            },
+            child: const Text("Delete"),
+          )
+        ],
+      ),
+    );
+  }
 }
+
 
