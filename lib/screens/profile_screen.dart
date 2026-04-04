@@ -45,7 +45,11 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   int _calculateStreak() {
     int streak = 0;
     for (bool done in weeklyStreak) {
-      if (done) streak++; else break;
+      if (done) {
+        streak++;
+      } else {
+        break;
+      }
     }
     return streak;
   }

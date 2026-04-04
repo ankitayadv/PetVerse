@@ -10,7 +10,6 @@ class StepFourScreen extends StatefulWidget {
   final bool isEditing;
   final int currentDogCount;
   final int currentCatCount;
-  // ✅ Added these to match Step Three's call
   final int maxDogs;
   final int maxCats;
 
@@ -20,7 +19,6 @@ class StepFourScreen extends StatefulWidget {
     this.isEditing = false,
     this.currentDogCount = 0,
     this.currentCatCount = 0,
-    // ✅ Initialized with defaults
     this.maxDogs = 0,
     this.maxCats = 0,
   });
@@ -44,6 +42,7 @@ class _StepFourScreenState extends State<StepFourScreen> {
   final _ageController = TextEditingController();
 
   XFile? _pickedFile;
+  String? _imageBase64; // String version for Firestore storage
   String _petType = "Dog";
   String? _selectedBreed;
   String? _selectedBloodGroup;
@@ -54,8 +53,6 @@ class _StepFourScreenState extends State<StepFourScreen> {
   @override
   void initState() {
     super.initState();
-
-    // Initialize data
     _loadData().then((_) {
       if (widget.isEditing && widget.existingPet != null) {
         _preFillData();
@@ -66,13 +63,9 @@ class _StepFourScreenState extends State<StepFourScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Safely extract arguments from ModalRoute
     final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-    
-    // Priority 1: Use direct constructor passed values (widget.maxDogs)
-    // Priority 2: Use ModalRoute arguments (args['maxDogs'])
-    dogLimit = widget.maxDogs > 0 ? widget.maxDogs : (args?['maxDogs'] ?? args?['dogGoal'] ?? 0);
-    catLimit = widget.maxCats > 0 ? widget.maxCats : (args?['maxCats'] ?? args?['catGoal'] ?? 0);
+    dogLimit = widget.maxDogs > 0 ? widget.maxDogs : (args?['maxDogs'] ?? 0);
+    catLimit = widget.maxCats > 0 ? widget.maxCats : (args?['maxCats'] ?? 0);
     totalLimit = args?['totalExpected'] ?? (dogLimit + catLimit);
   }
 
@@ -95,7 +88,6 @@ class _StepFourScreenState extends State<StepFourScreen> {
         _isLoading = false;
       });
     } catch (e) {
-      // Fallback Data
       _masterDataset = {
         "breeds": {
           "Dog": ["Labrador", "German Shepherd", "Golden Retriever", "Beagle", "Indie", "Pug", "Other"],
@@ -123,10 +115,54 @@ class _StepFourScreenState extends State<StepFourScreen> {
       _diseaseController.text = pet['disease'] ?? "";
       _selectedBreed = pet['breed'];
       _selectedBloodGroup = pet['blood'];
-      if (pet['image'] != null && pet['image'] is XFile) {
-        _pickedFile = pet['image'];
-      }
+      _imageBase64 = pet['imageBase64'];
     });
+  }
+
+  // --- Image Handling (Camera + Gallery) ---
+  Future<void> _pickImage(ImageSource source) async {
+    final ImagePicker picker = ImagePicker();
+    final XFile? image = await picker.pickImage(
+      source: source,
+      imageQuality: 50, // Compressed for Firestore efficiency
+    );
+
+    if (image != null) {
+      final bytes = await image.readAsBytes();
+      setState(() {
+        _pickedFile = image;
+        _imageBase64 = base64Encode(bytes);
+      });
+    }
+  }
+
+  void _showImageSourceSheet() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
+      builder: (context) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt_rounded, color: Colors.orange),
+              title: const Text('Take a Photo', style: TextStyle(fontFamily: 'Poppins')),
+              onTap: () {
+                Navigator.pop(context);
+                _pickImage(ImageSource.camera);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_rounded, color: Colors.orange),
+              title: const Text('Choose from Gallery', style: TextStyle(fontFamily: 'Poppins')),
+              onTap: () {
+                Navigator.pop(context);
+                _pickImage(ImageSource.gallery);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _submit() {
@@ -135,34 +171,7 @@ class _StepFourScreenState extends State<StepFourScreen> {
       return;
     }
 
-    final int currentDogs = widget.currentDogCount;
-    final int currentCats = widget.currentCatCount;
-    final int currentTotal = currentDogs + currentCats;
-
-    if (!widget.isEditing) {
-      // Dog Limit Check
-      if (_petType == "Dog") {
-        if (dogLimit > 0 && (currentDogs + 1) > dogLimit) {
-          _showSnackBar("You can't add more than $dogLimit Dog(s)", isError: true);
-          return;
-        }
-      }
-
-      // Cat Limit Check
-      if (_petType == "Cat") {
-        if (catLimit > 0 && (currentCats + 1) > catLimit) {
-          _showSnackBar("You can't add more than $catLimit Cat(s)", isError: true);
-          return;
-        }
-      }
-
-      // Total Limit Check
-      if (totalLimit > 0 && (currentTotal + 1) > totalLimit) {
-        _showSnackBar("You can only add total $totalLimit pet(s)", isError: true);
-        return;
-      }
-    }
-
+    // Return structured data for Step 3 to sync with Firestore
     Navigator.pop(context, {
       "name": _nameController.text.trim(),
       "type": _petType,
@@ -174,7 +183,8 @@ class _StepFourScreenState extends State<StepFourScreen> {
       "blood": _selectedBloodGroup ?? "Unknown",
       "features": _featuresController.text,
       "disease": _diseaseController.text,
-      "image": _pickedFile,
+      "imageBase64": _imageBase64, // Home screen will use this string
+      "updatedAt": DateTime.now().toIso8601String(),
     });
   }
 
@@ -186,85 +196,6 @@ class _StepFourScreenState extends State<StepFourScreen> {
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(20),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
-  }
-
-  Future<void> _pickImage() async {
-    final XFile? image = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 70);
-    if (image != null) setState(() => _pickedFile = image);
-  }
-
-  void _showAgePicker() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(20),
-        height: 350,
-        child: Column(
-          children: [
-            const Text("Select Age", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, fontFamily: 'Poppins')),
-            const SizedBox(height: 10),
-            Expanded(
-              child: ListWheelScrollView.useDelegate(
-                itemExtent: 50,
-                physics: const FixedExtentScrollPhysics(),
-                onSelectedItemChanged: (i) => setState(() => _ageController.text = i.toString()),
-                childDelegate: ListWheelChildBuilderDelegate(
-                  childCount: 25,
-                  builder: (c, i) => Center(child: Text("$i Years", style: const TextStyle(fontSize: 18, fontFamily: 'Poppins'))),
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
-              height: 55,
-              child: ElevatedButton(
-                onPressed: () => Navigator.pop(context),
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
-                child: const Text("Confirm", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-              ),
-            )
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showSearchablePicker({required String title, required List<String> data, required Function(String) onSelect}) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.7,
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          children: [
-            Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10))),
-            const SizedBox(height: 20),
-            Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, fontFamily: 'Poppins')),
-            const SizedBox(height: 20),
-            Expanded(
-              child: ListView.separated(
-                physics: const BouncingScrollPhysics(),
-                itemCount: data.length,
-                separatorBuilder: (c, i) => const Divider(height: 1),
-                itemBuilder: (c, i) => ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(data[i], style: const TextStyle(fontFamily: 'Poppins')),
-                  trailing: const Icon(Icons.chevron_right, size: 18),
-                  onTap: () {
-                    onSelect(data[i]);
-                    Navigator.pop(context);
-                  },
-                ),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -361,21 +292,20 @@ class _StepFourScreenState extends State<StepFourScreen> {
         alignment: Alignment.bottomRight,
         children: [
           Container(
-            height: 120,
-            width: 120,
+            height: 120, width: 120,
             decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: const Color(0xFFF8F8F8),
                 border: Border.all(color: Colors.orange.withOpacity(0.2), width: 2)),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(60),
-              child: _pickedFile != null
-                  ? (kIsWeb ? Image.network(_pickedFile!.path, fit: BoxFit.cover) : Image.file(File(_pickedFile!.path), fit: BoxFit.cover))
+              child: _imageBase64 != null
+                  ? Image.memory(base64Decode(_imageBase64!), fit: BoxFit.cover)
                   : const Icon(Icons.pets, size: 50, color: Colors.orange),
             ),
           ),
           GestureDetector(
-              onTap: _pickImage,
+              onTap: _showImageSourceSheet, // Triggers Camera/Gallery selection
               child: Container(
                   padding: const EdgeInsets.all(10),
                   decoration: const BoxDecoration(color: Colors.orange, shape: BoxShape.circle),
@@ -476,5 +406,79 @@ class _StepFourScreenState extends State<StepFourScreen> {
                 elevation: 0),
             child: Text(widget.isEditing ? "Save Changes" : "Continue",
                 style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold, fontFamily: 'Poppins'))));
+  }
+
+  void _showAgePicker() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        height: 350,
+        child: Column(
+          children: [
+            const Text("Select Age", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, fontFamily: 'Poppins')),
+            const SizedBox(height: 10),
+            Expanded(
+              child: ListWheelScrollView.useDelegate(
+                itemExtent: 50,
+                physics: const FixedExtentScrollPhysics(),
+                onSelectedItemChanged: (i) => setState(() => _ageController.text = i.toString()),
+                childDelegate: ListWheelChildBuilderDelegate(
+                  childCount: 25,
+                  builder: (c, i) => Center(child: Text("$i Years", style: const TextStyle(fontSize: 18, fontFamily: 'Poppins'))),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              height: 55,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
+                child: const Text("Confirm", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showSearchablePicker({required String title, required List<String> data, required Function(String) onSelect}) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.7,
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          children: [
+            Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10))),
+            const SizedBox(height: 20),
+            Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, fontFamily: 'Poppins')),
+            const SizedBox(height: 20),
+            Expanded(
+              child: ListView.separated(
+                physics: const BouncingScrollPhysics(),
+                itemCount: data.length,
+                separatorBuilder: (c, i) => const Divider(height: 1),
+                itemBuilder: (c, i) => ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(data[i], style: const TextStyle(fontFamily: 'Poppins')),
+                  trailing: const Icon(Icons.chevron_right, size: 18),
+                  onTap: () {
+                    onSelect(data[i]);
+                    Navigator.pop(context);
+                  },
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

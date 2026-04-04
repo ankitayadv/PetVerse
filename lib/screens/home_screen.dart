@@ -328,8 +328,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         borderRadius: BorderRadius.circular(20),
                         child: pet['image'] != null
                             ? (kIsWeb 
-                                ? Image.network(pet['image'].path, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.pets, color: Colors.orange)) 
-                                : Image.file(File(pet['image'].path), fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.pets, color: Colors.orange)))
+                                ? Image.network(pet['image'].path, fit: BoxFit.cover, errorBuilder: (_, _, _) => const Icon(Icons.pets, color: Colors.orange)) 
+                                : Image.file(File(pet['image'].path), fit: BoxFit.cover, errorBuilder: (_, _, _) => const Icon(Icons.pets, color: Colors.orange)))
                             : Image.asset("assets/images/pet_profile.png", fit: BoxFit.cover),
                       ),
                     ),
@@ -378,7 +378,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       child: Row(
                         children: [
-                          Image.asset(infoCards[i]["image"]!, height: 75, errorBuilder: (_, __, ___) => const Icon(Icons.info_outline)),
+                          Image.asset(infoCards[i]["image"]!, height: 75, errorBuilder: (_, _, _) => const Icon(Icons.info_outline)),
                           const SizedBox(width: 14),
                           Expanded(child: Text(infoCards[i]["text"]!, style: TextStyle(fontFamily: 'Poppins', fontSize: _responsiveSize(15), fontWeight: FontWeight.w500))),
                         ],
@@ -425,7 +425,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     child: Row(
                       children: [
-                        Image.asset(getImage(item["type"]), height: 35, errorBuilder: (_, __, ___) => const Icon(Icons.task_alt)),
+                        Image.asset(getImage(item["type"]), height: 35, errorBuilder: (_, _, _) => const Icon(Icons.task_alt)),
                         const SizedBox(width: 14),
                         Expanded(
                           child: Column(
@@ -491,7 +491,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   color: color.withOpacity(0.6),
                   borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
                 ),
-                child: Center(child: Image.asset(image, height: 60, errorBuilder: (_, __, ___) => const Icon(Icons.category, color: Colors.white))),
+                child: Center(child: Image.asset(image, height: 60, errorBuilder: (_, _, _) => const Icon(Icons.category, color: Colors.white))),
               ),
             ),
             Expanded(

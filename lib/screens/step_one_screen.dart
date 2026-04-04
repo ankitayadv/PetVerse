@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // ✅ Added Firestore
+import 'package:firebase_auth/firebase_auth.dart';    // ✅ Added Auth to get UID
 
 class StepOneScreen extends StatefulWidget {
   const StepOneScreen({super.key});
@@ -10,31 +12,63 @@ class StepOneScreen extends StatefulWidget {
 class _StepOneScreenState extends State<StepOneScreen> {
   int dogCount = 0;
   int catCount = 0;
+  bool _isSyncing = false; // To show loading state during DB write
 
-  void _handleContinue() {
-    // Validation: Ensure at least one pet is selected
-    if (dogCount + catCount > 0) {
-      // Navigating to Step Two and passing the counts as arguments
-      Navigator.pushNamed(
-        context,
-        '/steptwo',
-        arguments: {
-          'maxDogs': dogCount,
-          'maxCats': catCount,
-          'totalExpected': dogCount + catCount,
+  // 🔥 NEW: Firestore Sync Logic
+  Future<void> _savePetSelectionToFirestore() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      _showWarningSnackBar("User not authenticated!");
+      return;
+    }
+
+    setState(() => _isSyncing = true);
+
+    try {
+      // We save the basic counts to the user's profile document
+      // This helps initialize the dashboard later
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+        'onboardingCompleted': false,
+        'petStats': {
+          'dogCount': dogCount,
+          'catCount': catCount,
+          'totalPets': dogCount + catCount,
         },
-      );
-    } else {
-      _showWarningSnackBar();
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      if (mounted) {
+        Navigator.pushNamed(
+          context,
+          '/steptwo',
+          arguments: {
+            'maxDogs': dogCount,
+            'maxCats': catCount,
+            'totalExpected': dogCount + catCount,
+          },
+        );
+      }
+    } catch (e) {
+      _showWarningSnackBar("Database error: Please try again.");
+    } finally {
+      if (mounted) setState(() => _isSyncing = false);
     }
   }
 
-  void _showWarningSnackBar() {
+  void _handleContinue() {
+    if (dogCount + catCount > 0) {
+      _savePetSelectionToFirestore(); // ✅ Now calls Firestore before navigating
+    } else {
+      _showWarningSnackBar("Please add at least one pet to continue!");
+    }
+  }
+
+  void _showWarningSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: const Text(
-          "Please add at least one pet to continue!",
-          style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w500),
+        content: Text(
+          message,
+          style: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w500),
         ),
         backgroundColor: Colors.orange.shade800,
         behavior: SnackBarBehavior.floating,
@@ -73,7 +107,7 @@ class _StepOneScreenState extends State<StepOneScreen> {
     );
   }
 
-  // --- UI Components ---
+  // --- UI Components (Unchanged except for Loading Indicator in Button) ---
 
   PreferredSizeWidget _buildAppBar(BuildContext context) {
     return AppBar(
@@ -219,17 +253,19 @@ class _StepOneScreenState extends State<StepOneScreen> {
       width: double.infinity,
       height: 60,
       child: ElevatedButton(
-        onPressed: _handleContinue,
+        onPressed: _isSyncing ? null : _handleContinue, // ✅ Disable while syncing
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.orange,
           foregroundColor: Colors.white,
           elevation: 0,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         ),
-        child: const Text(
-          'Continue',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, fontFamily: 'Poppins'),
-        ),
+        child: _isSyncing 
+          ? const CircularProgressIndicator(color: Colors.white) // ✅ Added Loader
+          : const Text(
+              'Continue',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, fontFamily: 'Poppins'),
+            ),
       ),
     );
   }

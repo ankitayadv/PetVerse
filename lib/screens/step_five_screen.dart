@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
+import 'dart:convert'; // Added for base64Decode
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:cloud_firestore/cloud_firestore.dart'; // Added
+import 'package:firebase_auth/firebase_auth.dart';    // Added
 
 class StepFiveScreen extends StatefulWidget {
   const StepFiveScreen({super.key});
@@ -11,6 +14,7 @@ class StepFiveScreen extends StatefulWidget {
 
 class _StepFiveScreenState extends State<StepFiveScreen> {
   int? _selectedPetIndex;
+  bool _isSyncing = false; // Added to handle loading state
 
   final List<Color> _cardColors = [
     const Color(0xFFF0F9FF),
@@ -28,11 +32,10 @@ class _StepFiveScreenState extends State<StepFiveScreen> {
     Colors.deepPurple,
   ];
 
-  // ✅ UPDATED NAVIGATION LOGIC
-  // This handles both explicit selection and the "Skip for now" case.
-  void _navigateToHome(Map<String, dynamic> args, List<Map<String, dynamic>> myPets, {int? index}) {
-    // If index is null (Skip clicked), we try to default to the first pet, 
-    // or an empty map if the user didn't add any pets at all.
+  // ✅ UPDATED: Stores selection in Firestore before navigating
+  Future<void> _saveSelectionAndNavigate(Map<String, dynamic> args, List<Map<String, dynamic>> myPets, {int? index}) async {
+    setState(() => _isSyncing = true);
+    
     Map<String, dynamic> petToLoad = {};
     if (index != null) {
       petToLoad = myPets[index];
@@ -40,22 +43,39 @@ class _StepFiveScreenState extends State<StepFiveScreen> {
       petToLoad = myPets[0];
     }
 
-    Navigator.pushNamedAndRemoveUntil(
-      context,
-      '/home',
-      (r) => false,
-      arguments: {
-        ...args, // Preserves: ownerName, ownerLocation, ownerImage from Step 2
-        'selectedPet': petToLoad,
-        'allPets': myPets,
-      },
-    );
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        // Update Firestore with the selected pet and mark onboarding as complete
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'selectedPet': petToLoad,
+          'allPets': myPets,
+          'onboardingComplete': true,
+          'lastSelectedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      }
+    } catch (e) {
+      debugPrint("Error syncing selection: $e");
+    }
+
+    if (mounted) {
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        '/home',
+        (r) => false,
+        arguments: {
+          ...args,
+          'selectedPet': petToLoad,
+          'allPets': myPets,
+        },
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>? ?? {};
-    final List<Map<String, dynamic>> myPets = (args['pets'] as List<Map<String, dynamic>>?) ?? [];
+    final List<Map<String, dynamic>> myPets = (args['pets'] as List<dynamic>?)?.map((e) => Map<String, dynamic>.from(e)).toList() ?? [];
 
     return Scaffold(
       backgroundColor: const Color(0xFFFBFBFB),
@@ -66,6 +86,13 @@ class _StepFiveScreenState extends State<StepFiveScreen> {
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
+        actions: [
+          if (_isSyncing)
+            const Padding(
+              padding: EdgeInsets.only(right: 16.0),
+              child: Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.orange))),
+            )
+        ],
       ),
       body: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
@@ -111,14 +138,13 @@ class _StepFiveScreenState extends State<StepFiveScreen> {
 
             const SizedBox(height: 30),
 
-            // Main Action Button
             SizedBox(
               width: double.infinity,
               height: 62,
               child: ElevatedButton(
-                onPressed: _selectedPetIndex == null
+                onPressed: (_selectedPetIndex == null || _isSyncing)
                     ? null
-                    : () => _navigateToHome(args, myPets, index: _selectedPetIndex),
+                    : () => _saveSelectionAndNavigate(args, myPets, index: _selectedPetIndex),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.orange,
                   foregroundColor: Colors.white,
@@ -137,9 +163,8 @@ class _StepFiveScreenState extends State<StepFiveScreen> {
 
             const SizedBox(height: 16),
 
-            // ✅ SKIP FOR NOW - Works even if no pet is selected
             GestureDetector(
-              onTap: () => _navigateToHome(args, myPets),
+              onTap: _isSyncing ? null : () => _saveSelectionAndNavigate(args, myPets),
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8.0),
                 child: Text(
@@ -164,7 +189,8 @@ class _StepFiveScreenState extends State<StepFiveScreen> {
 
   Widget _buildEnhancedPetCard(Map<String, dynamic> pet, bool isSelected, Color bgColor, Color accentColor) {
     final bool isMale = pet['gender']?.toString().toLowerCase() == "male";
-    final dynamic image = pet['image'];
+    // UPDATED: Look for imageBase64 instead of File path
+    final String? imageBase64 = pet['imageBase64'];
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
@@ -190,7 +216,7 @@ class _StepFiveScreenState extends State<StepFiveScreen> {
             padding: const EdgeInsets.all(20),
             child: Row(
               children: [
-                _buildAvatar(image, accentColor),
+                _buildAvatar(imageBase64, accentColor),
                 const SizedBox(width: 16),
                 Expanded(
                   child: Column(
@@ -246,7 +272,7 @@ class _StepFiveScreenState extends State<StepFiveScreen> {
               children: [
                 _buildDetailRow(Icons.auto_awesome_outlined, "Distinguishing Features", pet['features']?.toString() ?? "None", accentColor),
                 const SizedBox(height: 12),
-                _buildDetailRow(Icons.history_edu_outlined, "Medical History", pet['diseases']?.toString() ?? "None", accentColor),
+                _buildDetailRow(Icons.history_edu_outlined, "Medical History", pet['disease']?.toString() ?? "None", accentColor),
               ],
             ),
           ),
@@ -274,14 +300,23 @@ class _StepFiveScreenState extends State<StepFiveScreen> {
     );
   }
 
-  Widget _buildAvatar(dynamic image, Color accent) {
+  // UPDATED: Now renders Base64 string from Step 4
+  Widget _buildAvatar(String? imageBase64, Color accent) {
     return Container(
       width: 75, height: 75,
-      decoration: BoxDecoration(borderRadius: BorderRadius.circular(22), color: accent.withOpacity(0.1)),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(22), 
+        color: accent.withOpacity(0.1),
+        border: Border.all(color: accent.withOpacity(0.1)),
+      ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(22),
-        child: image != null
-            ? (kIsWeb ? Image.network(image.path, fit: BoxFit.cover) : Image.file(File(image.path), fit: BoxFit.cover))
+        child: imageBase64 != null && imageBase64.isNotEmpty
+            ? Image.memory(
+                base64Decode(imageBase64),
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => Icon(Icons.pets, color: accent, size: 30),
+              )
             : Icon(Icons.pets, color: accent, size: 30),
       ),
     );

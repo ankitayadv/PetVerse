@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:io';
+import 'dart:convert'; // Added for base64Decode
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'step_four_screen.dart';
 import 'step_five_screen.dart';
 
@@ -16,17 +19,16 @@ class _StepThreeScreenState extends State<StepThreeScreen> {
   int maxDogs = 0;
   int maxCats = 0;
   bool _initialized = false;
-  
-  // This holds the combined data (Owner info + Pets)
+  bool _isSyncing = false;
+
   Map<String, dynamic> _allData = {};
 
   @override
   Widget build(BuildContext context) {
     if (!_initialized) {
       final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-      _allData = args ?? {}; 
+      _allData = args ?? {};
 
-      // Force conversion to int to avoid the "String is not a subtype of int" error
       maxDogs = int.tryParse(_allData['maxDogs']?.toString() ?? '0') ?? 0;
       maxCats = int.tryParse(_allData['maxCats']?.toString() ?? '0') ?? 0;
 
@@ -44,38 +46,111 @@ class _StepThreeScreenState extends State<StepThreeScreen> {
         centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
+        actions: [
+          if (_isSyncing)
+            const Padding(
+              padding: EdgeInsets.only(right: 16.0),
+              child: Center(child: SizedBox(width: 15, height: 15, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.orange))),
+            )
+        ],
       ),
       body: Column(
         children: [
           const SizedBox(height: 10),
           const Text(
-            "Your Pet Family", 
-            style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, fontFamily: 'Poppins', color: Color(0xFF2D2D2D))
+            "Your Pet Family",
+            style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, fontFamily: 'Poppins', color: Color(0xFF2D2D2D)),
           ),
           Text(
-            "Added ${_petFamily.length} ${_petFamily.length == 1 ? 'Pet' : 'Pets'} " 
+            "Added ${_petFamily.length} ${_petFamily.length == 1 ? 'Pet' : 'Pets'} "
             "(${_countByType('Dog')} Dogs, ${_countByType('Cat')} Cats)",
             style: const TextStyle(color: Colors.orange, fontWeight: FontWeight.w600, fontSize: 13),
           ),
           const SizedBox(height: 24),
-          
           _buildPremiumCard(),
-          
           Expanded(
-            child: _petFamily.isEmpty 
-              ? _buildEmptyState() 
-              : ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-                  itemCount: _petFamily.length,
-                  itemBuilder: (context, index) => _buildPetCard(_petFamily[index], index),
-                ),
+            child: _petFamily.isEmpty
+                ? _buildEmptyState()
+                : ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                    itemCount: _petFamily.length,
+                    itemBuilder: (context, index) => _buildPetCard(_petFamily[index], index),
+                  ),
           ),
-
           _buildProfessionalBottomActions(),
         ],
       ),
     );
   }
+
+  // --- Firestore Sync Logic ---
+  Future<void> _syncPetFamilyToFirebase() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    setState(() => _isSyncing = true);
+
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+        'pets': _petFamily,
+        'petCount': _petFamily.length,
+        'onboardingStep': 3,
+        'lastUpdated': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (e) {
+      debugPrint("Firestore Sync Error: $e");
+    } finally {
+      if (mounted) setState(() => _isSyncing = false);
+    }
+  }
+
+  int _countByType(String type) => _petFamily.where((p) => p['type'] == type).length;
+
+  Future<void> _navigateToAddPet({bool isEditing = false, int? index}) async {
+    final result = await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => StepFourScreen(
+            isEditing: isEditing,
+            existingPet: isEditing ? _petFamily[index!] : null,
+            currentDogCount: _countByType('Dog'),
+            currentCatCount: _countByType('Cat'),
+            maxDogs: maxDogs,
+            maxCats: maxCats,
+          ),
+          settings: RouteSettings(
+            arguments: {
+              'maxDogs': maxDogs,
+              'maxCats': maxCats,
+              'totalExpected': maxDogs + maxCats,
+            },
+          ),
+        ));
+
+    if (result != null && result is Map<String, dynamic>) {
+      setState(() {
+        if (isEditing) {
+          _petFamily[index!] = result;
+        } else {
+          _petFamily.add(result);
+        }
+      });
+      await _syncPetFamilyToFirebase();
+    }
+  }
+
+  void _navigateToStepFive() {
+    final Map<String, dynamic> dataToSend = Map.from(_allData);
+    dataToSend['pets'] = List<Map<String, dynamic>>.from(_petFamily);
+
+    Navigator.push(
+        context,
+        MaterialPageRoute(
+            builder: (context) => const StepFiveScreen(),
+            settings: RouteSettings(arguments: dataToSend)));
+  }
+
+  // --- UI Components ---
 
   Widget _buildPremiumCard() {
     return Container(
@@ -133,7 +208,8 @@ class _StepThreeScreenState extends State<StepThreeScreen> {
         ),
         child: Row(
           children: [
-            _buildAvatar(pet['image']),
+            // Updated Avatar to use the correct helper
+            _buildAvatar(pet['imageBase64']), 
             const SizedBox(width: 16),
             Expanded(
               child: Column(
@@ -161,7 +237,10 @@ class _StepThreeScreenState extends State<StepThreeScreen> {
                 const SizedBox(height: 8),
                 IconButton(
                   icon: Icon(Icons.delete_sweep_outlined, color: Colors.red.shade300),
-                  onPressed: () => setState(() => _petFamily.removeAt(index)),
+                  onPressed: () async {
+                    setState(() => _petFamily.removeAt(index));
+                    await _syncPetFamilyToFirebase();
+                  },
                 ),
               ],
             ),
@@ -171,14 +250,24 @@ class _StepThreeScreenState extends State<StepThreeScreen> {
     );
   }
 
-  Widget _buildAvatar(dynamic image) {
+  // UPDATED: Now correctly handles the Base64 String sent from Step 4
+  Widget _buildAvatar(String? imageBase64) {
     return Container(
-      width: 64, height: 64,
-      decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), color: Colors.orange.shade50),
+      width: 64,
+      height: 64,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18), 
+        color: Colors.orange.shade50,
+        border: Border.all(color: Colors.orange.withOpacity(0.1))
+      ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(18),
-        child: image != null
-            ? (kIsWeb ? Image.network(image.path, fit: BoxFit.cover) : Image.file(File(image.path), fit: BoxFit.cover))
+        child: imageBase64 != null && imageBase64.isNotEmpty
+            ? Image.memory(
+                base64Decode(imageBase64),
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => const Icon(Icons.pets, color: Colors.orange),
+              )
             : const Icon(Icons.pets, color: Colors.orange, size: 28),
       ),
     );
@@ -203,14 +292,12 @@ class _StepThreeScreenState extends State<StepThreeScreen> {
             width: double.infinity,
             height: 58,
             child: ElevatedButton.icon(
-              onPressed: isFullyComplete 
-                ? () => _showSnackBar("Family goal reached! You can proceed now.") 
-                : () => _navigateToAddPet(),
+              onPressed: isFullyComplete
+                  ? () => _showSnackBar("Family goal reached! You can proceed now.")
+                  : () => _navigateToAddPet(),
               icon: Icon(isFullyComplete ? Icons.task_alt : Icons.add_rounded, color: Colors.white),
-              label: Text(
-                isFullyComplete ? "Family Goals Met" : "Add Another Pet", 
-                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.white)
-              ),
+              label: Text(isFullyComplete ? "Family Goals Met" : "Add Another Pet",
+                  style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.white)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: isFullyComplete ? Colors.teal : Colors.orange,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
@@ -238,10 +325,7 @@ class _StepThreeScreenState extends State<StepThreeScreen> {
             onTap: () => _navigateToStepFive(),
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 8.0),
-              child: Text(
-                "Skip for now", 
-                style: TextStyle(color: Colors.grey.shade500, fontSize: 14, fontWeight: FontWeight.w500)
-              ),
+              child: Text("Skip for now", style: TextStyle(color: Colors.grey.shade500, fontSize: 14, fontWeight: FontWeight.w500)),
             ),
           ),
         ],
@@ -296,8 +380,9 @@ class _StepThreeScreenState extends State<StepThreeScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: () {
+                      onPressed: () async {
                         Navigator.pop(context);
+                        await _syncPetFamilyToFirebase();
                         _navigateToStepFive();
                       },
                       style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, elevation: 0),
@@ -310,55 +395,6 @@ class _StepThreeScreenState extends State<StepThreeScreen> {
           ),
         ),
       ),
-    );
-  }
-
-  int _countByType(String type) => _petFamily.where((p) => p['type'] == type).length;
-
-  Future<void> _navigateToAddPet({bool isEditing = false, int? index}) async {
-    final result = await Navigator.push(
-      context, 
-      MaterialPageRoute(
-        builder: (context) => StepFourScreen(
-          isEditing: isEditing, 
-          existingPet: isEditing ? _petFamily[index!] : null, 
-          currentDogCount: _countByType('Dog'), 
-          currentCatCount: _countByType('Cat'),
-          maxDogs: maxDogs,
-          maxCats: maxCats,
-        ),
-        settings: RouteSettings(
-          arguments: {
-            'maxDogs': maxDogs,
-            'maxCats': maxCats,
-            'totalExpected': maxDogs + maxCats,
-          },
-        ),
-      )
-    );
-
-    if (result != null && result is Map<String, dynamic>) {
-      setState(() { 
-        if (isEditing) { 
-          _petFamily[index!] = result; 
-        } else { 
-          _petFamily.add(result); 
-        } 
-      });
-    }
-  }
-  
-
-  void _navigateToStepFive() {
-    final Map<String, dynamic> dataToSend = Map.from(_allData);
-    dataToSend['pets'] = List<Map<String, dynamic>>.from(_petFamily);
-
-    Navigator.push(
-      context, 
-      MaterialPageRoute(
-        builder: (context) => const StepFiveScreen(), 
-        settings: RouteSettings(arguments: dataToSend) 
-      )
     );
   }
 

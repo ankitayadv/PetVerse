@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:country_picker/country_picker.dart';
 import 'package:country_state_city/country_state_city.dart' as csc;
-import 'package:geolocator/geolocator.dart';
-import 'package:http/http.dart' as http;
+import 'package:geolocator/geolocator.dart'; 
+import 'package:geocoding/geocoding.dart'; 
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class StepTwoScreen extends StatefulWidget {
   const StepTwoScreen({super.key});
@@ -15,18 +17,19 @@ class StepTwoScreen extends StatefulWidget {
 }
 
 class _StepTwoScreenState extends State<StepTwoScreen> {
-  // --- Form Key for Validations ---
   final _formKey = GlobalKey<FormState>();
-
+  
   // --- State Variables ---
-  Uint8List? _webImage;
+  Uint8List? _profileImageBytes;
+  String? _imageBase64; 
   String _selectedGender = "Male";
   String _selectedCountryName = "Select Country";
   String _selectedCountryCode = "";
-  String _selectedPhonePrefix = ""; // Stores the +91, +1, etc.
+  String _selectedPhonePrefix = "";
   String? _selectedState;
   String? _selectedCity;
   String _calculatedAge = "Select DOB";
+  bool _isSyncing = false;
   bool _isLoadingLocation = false;
   bool _isTermsAccepted = false;
 
@@ -37,269 +40,234 @@ class _StepTwoScreenState extends State<StepTwoScreen> {
   List<csc.State> _states = [];
   List<csc.City> _cities = [];
 
-  // --- Logic: Consent Dialog (Reverted to original UI) ---
-  void _showConsentDialog(Map<String, dynamic> args) {
+  // --- Image Picker (Camera & Gallery) ---
+  Future<void> _pickImage(ImageSource source) async {
+    final ImagePicker picker = ImagePicker();
+    try {
+      final XFile? image = await picker.pickImage(
+        source: source, 
+        imageQuality: 40,
+        maxWidth: 500,
+      );
+      
+      if (image != null) {
+        final bytes = await image.readAsBytes();
+        setState(() {
+          _profileImageBytes = bytes;
+          _imageBase64 = base64Encode(bytes);
+        });
+      }
+    } catch (e) {
+      debugPrint("Image Error: $e");
+    }
+  }
+
+  void _showImageSourceOptions() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (context) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt, color: Colors.orange),
+              title: const Text('Take a Photo'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickImage(ImageSource.camera);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library, color: Colors.orange),
+              title: const Text('Choose from Gallery'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickImage(ImageSource.gallery);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // --- Location Logic ---
+  Future<void> _detectLocation() async {
+    setState(() => _isLoadingLocation = true);
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      Position position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high)
+      );
+      
+      List<Placemark> placemarks = await placemarkFromCoordinates(
+        position.latitude, position.longitude
+      );
+
+      if (placemarks.isNotEmpty) {
+        Placemark place = placemarks[0];
+        setState(() {
+          _addressController.text = "${place.street}, ${place.subLocality}, ${place.locality}";
+        });
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Location Error: $e")));
+    } finally {
+      if (mounted) setState(() => _isLoadingLocation = false);
+    }
+  }
+
+  // --- Navigation & Sync ---
+  Future<void> _handleContinue(Map<String, dynamic> previousArgs) async {
+    if (!_formKey.currentState!.validate()) return;
+    
+    final Map<String, dynamic> ownerData = {
+      'ownerName': _nameController.text.trim(),
+      'ownerPhone': '$_selectedPhonePrefix${_phoneController.text.trim()}',
+      'ownerGender': _selectedGender,
+      'ownerAge': _calculatedAge,
+      'country': _selectedCountryName,
+      'state': _selectedState,
+      'city': _selectedCity,
+      'streetAddress': _addressController.text.trim(),
+      'ownerImageBase64': _imageBase64, // Field name fixed for HomeScreen
+    };
+
+    final Map<String, dynamic> updatedArgs = Map<String, dynamic>.from(previousArgs)..addAll(ownerData);
+    _showPrivacyConsentDialog(updatedArgs);
+  }
+
+  void _showPrivacyConsentDialog(Map<String, dynamic> args) {
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => StatefulBuilder(
-        builder: (context, setModalState) {
-          return Dialog(
-            backgroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-            // Add inset padding to make the dialog narrower on tablets/web
-            insetPadding: const EdgeInsets.symmetric(horizontal: 40.0, vertical: 24.0), 
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(24, 30, 24, 24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.security, color: Colors.orange, size: 42),
-                  const SizedBox(height: 20),
-                  const Text(
-                    "Privacy & Consent",
-                    textAlign: TextAlign.center, // Title centered
-                    style: TextStyle(
-                      fontSize: 20, 
-                      fontWeight: FontWeight.bold, 
-                      fontFamily: 'Poppins', 
-                      color: Colors.black
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    "To provide a personalized experience for you and your pets, PetVerse requires your consent for the following:",
-                    textAlign: TextAlign.center, // Body text centered
-                    style: TextStyle(
-                      fontSize: 12, 
-                      color: Colors.black87, 
-                      fontFamily: 'Poppins',
-                      height: 1.5 // Added line height for readability
-                    ),
-                  ),
-                  const SizedBox(height: 30),
-
-                  // Reverting the 3 specific list items
-                  _buildConsentRow(Icons.storage, "Profile Management", "Securely store your contact and pet information.", Colors.orange),
-                  _buildConsentRow(Icons.location_on, "Location Services", "Access address data to find nearby veterinary clinics.", Colors.orange),
-                  _buildConsentRow(Icons.verified_user, "Data Protection", "Your information is handled according to our Privacy Policy.", Colors.green), // Restored 3rd item
-
-                  const SizedBox(height: 16),
-
-                  // Checkbox Area (Reverted styling)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFCF9F3), // Original light background
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        Theme(
-                          // Customize checkbox color
-                          data: ThemeData(unselectedWidgetColor: Colors.grey),
-                          child: Checkbox(
-                            activeColor: const Color(0xFFC0A071), // Brownish accent from image
-                            value: _isTermsAccepted,
-                            onChanged: (val) => setModalState(() => _isTermsAccepted = val!),
-                          ),
-                        ),
-                        const Expanded(
-                          child: Text("I agree to the Terms & Privacy Policy", 
-                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, fontFamily: 'Poppins', color: Colors.black)),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Buttons (Reverted styling)
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextButton(
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            backgroundColor: Colors.transparent, // Simple transparent button
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text("Decline", style: TextStyle(color: Colors.grey, fontSize: 13, fontWeight: FontWeight.bold, fontFamily: 'Poppins')),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: TextButton(
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            backgroundColor: _isTermsAccepted ? const Color(0xFFC0A071) : Colors.grey[300], // Brown accent
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                          onPressed: _isTermsAccepted ? () {
-                            Navigator.pop(context);
-                            Navigator.pushNamed(context, '/stepthree', arguments: args);
-                          } : null,
-                          child: Text("Accept", 
-                            style: TextStyle(
-                              color: _isTermsAccepted ? Colors.white : Colors.grey[600], 
-                              fontSize: 13, 
-                              fontWeight: FontWeight.bold, 
-                              fontFamily: 'Poppins'
-                            )
-                          ),
-                        ),
-                      ),
-                    ],
-                  )
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  // --- Helper: Build Consent Row (Updated to match original) ---
-  Widget _buildConsentRow(IconData icon, String title, String sub, Color iconColor) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: iconColor, size: 22),
-          const SizedBox(width: 16),
-          Expanded(
+        builder: (context, setModalState) => Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, fontFamily: 'Poppins', color: Colors.black)),
-                const SizedBox(height: 2), // Small gap before subtitle
-                Text(sub, style: const TextStyle(fontSize: 11, color: Colors.black87, fontFamily: 'Poppins')),
+                const Icon(Icons.shield, color: Colors.orange, size: 48),
+                const SizedBox(height: 16),
+                const Text("Privacy & Consent", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, fontFamily: 'Poppins')),
+                const SizedBox(height: 12),
+                const Text("To provide a personalized experience, PetVerse requires your consent to store profile and location data.", textAlign: TextAlign.center, style: TextStyle(fontSize: 13)),
+                const SizedBox(height: 20),
+                _buildConsentItem(Icons.storage_rounded, "Profile Management", "Securely store your contact info."),
+                _buildConsentItem(Icons.location_on, "Location Services", "Find nearby veterinary clinics."),
+                const SizedBox(height: 20),
+                CheckboxListTile(
+                  value: _isTermsAccepted,
+                  activeColor: Colors.orange,
+                  title: const Text("I agree to the Terms & Privacy Policy", style: TextStyle(fontSize: 12)),
+                  onChanged: (val) => setModalState(() => _isTermsAccepted = val!),
+                  controlAffinity: ListTileControlAffinity.leading,
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(context), child: const Text("Decline"))),
+                    const SizedBox(width: 12),
+                    Expanded(child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+                      onPressed: _isTermsAccepted ? () => _saveAndNavigate(args) : null,
+                      child: const Text("Accept", style: TextStyle(color: Colors.white)),
+                    )),
+                  ],
+                )
               ],
             ),
-          )
-        ],
+          ),
+        ),
       ),
     );
   }
 
-  // --- Logic: Navigation & Validation ---
-  void _validateAndProceed(Map<String, dynamic> previousArgs) {
-    if (_formKey.currentState!.validate()) {
-      // Additional check for Country selection
-      if (_selectedCountryCode.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Please select your country")),
-        );
-        return;
-      }
-
-      final updatedArgs = {
-        ...previousArgs,
-        'ownerName': _nameController.text.trim(),
-        'ownerPhone': '$_selectedPhonePrefix${_phoneController.text.trim()}',
-        'ownerGender': _selectedGender,
-        'ownerLocation': _selectedCity ?? "Not Set",
-        'ownerImage': _webImage,
-      };
-
-      _showConsentDialog(updatedArgs);
+  Future<void> _saveAndNavigate(Map<String, dynamic> args) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    setState(() => _isSyncing = true);
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+        'ownerName': args['ownerName'],
+        'ownerImageBase64': args['ownerImageBase64'],
+        'ownerDetails': args,
+        'onboardingStep': 2,
+      }, SetOptions(merge: true));
+      
+      if (mounted) Navigator.pushNamed(context, '/stepthree', arguments: args);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Sync Error: $e")));
+    } finally {
+      if (mounted) setState(() => _isSyncing = false);
     }
   }
 
-  // --- Logic: Location Detection ---
-  Future<void> _detectLocation() async {
-    setState(() => _isLoadingLocation = true);
-    try {
-      Position position = await Geolocator.getCurrentPosition();
-      final response = await http.get(Uri.parse(
-          'https://nominatim.openstreetmap.org/reverse?format=json&lat=${position.latitude}&lon=${position.longitude}'));
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        setState(() {
-          _selectedCountryName = data['address']['country'] ?? "Select Country";
-          _addressController.text = data['display_name'] ?? "";
-        });
-      }
-    } catch (_) {}
-    setState(() => _isLoadingLocation = false);
-  }
-
+  // --- Build UI ---
   @override
   Widget build(BuildContext context) {
-    final Map<String, dynamic> argsFromStepOne =
-        (ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?) ?? {};
+    final Map<String, dynamic> argsFromStepOne = (ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?) ?? {};
 
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
         leading: IconButton(icon: const Icon(Icons.arrow_back_ios, color: Colors.orange, size: 18), onPressed: () => Navigator.pop(context)),
-        title: const Text("Step 2 of 5", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 14, fontFamily: 'Poppins')),
+        title: const Text("Step 2 of 5", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 14)),
         centerTitle: true, elevation: 0, backgroundColor: Colors.white,
       ),
-      body: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 24.0),
+        child: Form(
+          key: _formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Center(child: Text("Owner Profile", style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, fontFamily: 'Poppins'))),
+              const Center(child: Text("Owner Profile", style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold))),
               const SizedBox(height: 20),
               Center(child: _buildProfilePicker()),
               const SizedBox(height: 30),
-
               _buildSectionLabel("Full Name *"),
-              _buildNameField(),
-
+              _buildTextField(controller: _nameController, label: "Your Name", icon: Icons.person_outline),
               _buildSectionLabel("Phone Number *"),
               _buildPhoneField(),
-
               _buildSectionLabel("Your Age"),
               _buildDatePickerField(),
-
               _buildSectionLabel("Gender"),
               _buildGenderSelection(),
-
               const Divider(height: 40),
-
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text("Address Details", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, fontFamily: 'Poppins')),
+                  const Text("Address Details", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   TextButton.icon(
                     onPressed: _isLoadingLocation ? null : _detectLocation,
-                    icon: _isLoadingLocation
-                        ? const SizedBox(width: 15, height: 15, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.orange))
-                        : const Icon(Icons.my_location, color: Colors.orange, size: 18),
-                    label: Text(_isLoadingLocation ? "Locating..." : "Auto GPS", style: const TextStyle(color: Colors.orange, fontSize: 12)),
+                    icon: _isLoadingLocation ? const SizedBox(width: 15, height: 15, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.my_location, size: 18),
+                    label: Text(_isLoadingLocation ? "Locating..." : "Auto GPS"),
                   )
                 ],
               ),
-
               _buildCountrySelector(),
               const SizedBox(height: 15),
               _buildStateDropdown(),
               const SizedBox(height: 15),
               _buildCityDropdown(),
-
               _buildSectionLabel("Street Address"),
-              _buildAddressField(),
-
+              _buildTextField(controller: _addressController, label: "House No, Plot No", icon: Icons.home_outlined, maxLines: 2),
               const SizedBox(height: 40),
-
               SizedBox(
-                width: double.infinity,
-                height: 58,
+                width: double.infinity, height: 58,
                 child: ElevatedButton(
-                  onPressed: () => _validateAndProceed(argsFromStepOne),
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)), elevation: 0),
-                  child: const Text("Continue", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                  onPressed: _isSyncing ? null : () => _handleContinue(argsFromStepOne),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
+                  child: _isSyncing ? const CircularProgressIndicator(color: Colors.white) : const Text("Continue", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                 ),
               ),
-              Center(child: TextButton(onPressed: () => Navigator.pushNamed(context, '/stepthree', arguments: argsFromStepOne), child: const Text("Skip for now", style: TextStyle(color: Colors.grey, fontSize: 12)))),
               const SizedBox(height: 30),
             ],
           ),
@@ -308,44 +276,31 @@ class _StepTwoScreenState extends State<StepTwoScreen> {
     );
   }
 
-  // --- UI Components ---
-
+  // --- Widgets ---
   Widget _buildProfilePicker() {
     return GestureDetector(
-      onTap: () async {
-        final ImagePicker picker = ImagePicker();
-        final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-        if (image != null) {
-          var bytes = await image.readAsBytes();
-          setState(() => _webImage = bytes);
-        }
-      },
-      child: Stack(
-        alignment: Alignment.bottomRight,
-        children: [
-          CircleAvatar(
-            radius: 55,
-            backgroundColor: const Color(0xFFF9F9F9),
-            backgroundImage: _webImage != null
-                ? MemoryImage(_webImage!)
-                : const NetworkImage("https://cdn-icons-png.flaticon.com/512/149/149071.png") as ImageProvider,
-          ),
-          const CircleAvatar(radius: 18, backgroundColor: Colors.orange, child: Icon(Icons.camera_alt, color: Colors.white, size: 16)),
-        ],
-      ),
+      onTap: _showImageSourceOptions,
+      child: Stack(alignment: Alignment.bottomRight, children: [
+        CircleAvatar(
+          radius: 55, backgroundColor: const Color(0xFFF9F9F9),
+          backgroundImage: _profileImageBytes != null ? MemoryImage(_profileImageBytes!) : null,
+          child: _profileImageBytes == null ? const Icon(Icons.person, size: 50, color: Colors.grey) : null,
+        ),
+        const CircleAvatar(radius: 18, backgroundColor: Colors.orange, child: Icon(Icons.camera_alt, color: Colors.white, size: 16)),
+      ]),
     );
   }
 
-  Widget _buildNameField() {
+  Widget _buildTextField({required TextEditingController controller, required String label, required IconData icon, int maxLines = 1}) {
     return TextFormField(
-      controller: _nameController,
-      validator: (value) => (value == null || value.isEmpty) ? "Please enter your name" : null,
+      controller: controller,
+      maxLines: maxLines,
+      validator: (val) => val!.isEmpty ? "Required field" : null,
       decoration: InputDecoration(
-          hintText: "Your Name",
-          prefixIcon: const Icon(Icons.person_outline, color: Colors.orange),
-          filled: true,
-          fillColor: const Color(0xFFF9F9F9),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)),
+        labelText: label, prefixIcon: Icon(icon, color: Colors.orange),
+        filled: true, fillColor: const Color(0xFFF9F9F9),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+      ),
     );
   }
 
@@ -353,70 +308,34 @@ class _StepTwoScreenState extends State<StepTwoScreen> {
     return TextFormField(
       controller: _phoneController,
       keyboardType: TextInputType.phone,
-      validator: (value) {
-        if (value == null || value.isEmpty) return "Phone number is required";
-        if (value.length < 7) return "Invalid phone number";
-        return null;
-      },
       decoration: InputDecoration(
-          hintText: "Enter Number",
-          // The prefix displays the code once a country is selected
-          prefixIcon: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(width: 12),
-              const Icon(Icons.phone_android_outlined, color: Colors.orange),
-              if (_selectedPhonePrefix.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(left: 8.0),
-                  child: Text(_selectedPhonePrefix, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
-                ),
-              const SizedBox(width: 8),
-            ],
-          ),
-          filled: true,
-          fillColor: const Color(0xFFF9F9F9),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)),
-    );
-  }
-
-  Widget _buildAddressField() {
-    return TextFormField(
-      controller: _addressController,
-      decoration: InputDecoration(
-          hintText: "House No, Area, Landmark",
-          prefixIcon: const Icon(Icons.home_outlined, color: Colors.orange),
-          filled: true,
-          fillColor: const Color(0xFFF9F9F9),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)),
+        hintText: "Enter Number",
+        prefixIcon: Row(mainAxisSize: MainAxisSize.min, children: [
+          const SizedBox(width: 12),
+          const Icon(Icons.phone_android_outlined, color: Colors.orange),
+          if (_selectedPhonePrefix.isNotEmpty) Padding(padding: const EdgeInsets.only(left: 8), child: Text(_selectedPhonePrefix)),
+          const SizedBox(width: 8),
+        ]),
+        filled: true, fillColor: const Color(0xFFF9F9F9),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+      ),
     );
   }
 
   Widget _buildSectionLabel(String label) => Padding(padding: const EdgeInsets.only(bottom: 8, top: 16), child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold)));
 
   Widget _buildGenderSelection() {
-    return Row(
-      children: ["Male", "Female", "Other"].map((g) => Padding(
-        padding: const EdgeInsets.only(right: 8),
-        child: ChoiceChip(
-          label: Text(g),
-          selected: _selectedGender == g,
-          onSelected: (s) => setState(() => _selectedGender = g),
-          selectedColor: Colors.orange,
-          labelStyle: TextStyle(color: _selectedGender == g ? Colors.white : Colors.black),
-        ),
-      )).toList(),
-    );
+    return Row(children: ["Male", "Female", "Other"].map((g) => Padding(padding: const EdgeInsets.only(right: 8), child: ChoiceChip(
+      label: Text(g), selected: _selectedGender == g, onSelected: (s) => setState(() => _selectedGender = g),
+      selectedColor: Colors.orange, labelStyle: TextStyle(color: _selectedGender == g ? Colors.white : Colors.black),
+    ))).toList());
   }
 
   Widget _buildDatePickerField() {
     return InkWell(
       onTap: () async {
         final DateTime? picked = await showDatePicker(context: context, initialDate: DateTime(2000), firstDate: DateTime(1950), lastDate: DateTime.now());
-        if (picked != null) {
-          int age = DateTime.now().year - picked.year;
-          setState(() => _calculatedAge = "$age Years Old");
-        }
+        if (picked != null) setState(() => _calculatedAge = "${DateTime.now().year - picked.year} Years Old");
       },
       child: Container(
         padding: const EdgeInsets.all(16),
@@ -428,30 +347,21 @@ class _StepTwoScreenState extends State<StepTwoScreen> {
 
   Widget _buildCountrySelector() {
     return GestureDetector(
-      onTap: () => showCountryPicker(
-        context: context,
-        onSelect: (Country c) async {
-          final states = await csc.getStatesOfCountry(c.countryCode);
-          setState(() {
-            _selectedCountryName = "${c.flagEmoji} ${c.name}";
-            _selectedCountryCode = c.countryCode;
-            _selectedPhonePrefix = "+${c.phoneCode}"; // Dynamic Phone Code
-            _states = states;
-            _selectedState = null;
-            _selectedCity = null;
-          });
-        },
-      ),
+      onTap: () => showCountryPicker(context: context, onSelect: (Country c) async {
+        final states = await csc.getStatesOfCountry(c.countryCode);
+        setState(() {
+          _selectedCountryName = "${c.flagEmoji} ${c.name}";
+          _selectedCountryCode = c.countryCode;
+          _selectedPhonePrefix = "+${c.phoneCode}";
+          _states = states;
+          _selectedState = null;
+          _selectedCity = null;
+        });
+      }),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(color: const Color(0xFFF9F9F9), borderRadius: BorderRadius.circular(12)),
-        child: Row(children: [
-          const Icon(Icons.public, color: Colors.orange),
-          const SizedBox(width: 12),
-          Text(_selectedCountryName),
-          const Spacer(),
-          const Icon(Icons.arrow_drop_down)
-        ]),
+        child: Row(children: [const Icon(Icons.public, color: Colors.orange), const SizedBox(width: 12), Text(_selectedCountryName), const Spacer(), const Icon(Icons.arrow_drop_down)]),
       ),
     );
   }
@@ -460,20 +370,16 @@ class _StepTwoScreenState extends State<StepTwoScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(color: const Color(0xFFF9F9F9), borderRadius: BorderRadius.circular(12)),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          isExpanded: true,
-          hint: Text(_selectedState ?? "Select State"),
-          value: _states.any((s) => s.name == _selectedState) ? _selectedState : null,
-          items: _states.map((s) => DropdownMenuItem(value: s.name, child: Text(s.name))).toList(),
-          onChanged: (val) async {
-            if (val == null) return;
-            final stateObj = _states.firstWhere((s) => s.name == val);
-            final cities = await csc.getStateCities(_selectedCountryCode, stateObj.isoCode);
-            setState(() { _selectedState = val; _cities = cities; _selectedCity = null; });
-          },
-        ),
-      ),
+      child: DropdownButtonHideUnderline(child: DropdownButton<String>(
+        isExpanded: true, hint: Text(_selectedState ?? "Select State"),
+        items: _states.map((s) => DropdownMenuItem(value: s.name, child: Text(s.name))).toList(),
+        onChanged: (val) async {
+          if (val == null) return;
+          final stateObj = _states.firstWhere((s) => s.name == val);
+          final cities = await csc.getStateCities(_selectedCountryCode, stateObj.isoCode);
+          setState(() { _selectedState = val; _cities = cities; _selectedCity = null; });
+        },
+      )),
     );
   }
 
@@ -481,15 +387,25 @@ class _StepTwoScreenState extends State<StepTwoScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(color: const Color(0xFFF9F9F9), borderRadius: BorderRadius.circular(12)),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          isExpanded: true,
-          hint: Text(_selectedCity ?? "Select City"),
-          value: _cities.any((c) => c.name == _selectedCity) ? _selectedCity : null,
-          items: _cities.map((c) => DropdownMenuItem(value: c.name, child: Text(c.name))).toList(),
-          onChanged: (val) => setState(() => _selectedCity = val),
-        ),
-      ),
+      child: DropdownButtonHideUnderline(child: DropdownButton<String>(
+        isExpanded: true, hint: Text(_selectedCity ?? "Select City"),
+        items: _cities.map((c) => DropdownMenuItem(value: c.name, child: Text(c.name))).toList(),
+        onChanged: (val) => setState(() => _selectedCity = val),
+      )),
+    );
+  }
+
+  Widget _buildConsentItem(IconData icon, String title, String sub) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(children: [
+        Icon(icon, color: Colors.orange, size: 20),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+          Text(sub, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+        ]))
+      ]),
     );
   }
 }

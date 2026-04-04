@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -10,6 +11,8 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin {
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
   final TextEditingController forgotPassController = TextEditingController();
@@ -27,6 +30,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     );
   }
 
+  // ✅ VALIDATION LOGIC
   String? _getValidationError() {
     final email = emailController.text.trim();
     final password = passwordController.text.trim();
@@ -38,7 +42,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     return null;
   }
 
-  // 🔥 LOGIN LOGIC: Login -> HomeScreen (MainNavigation)
+  // 🔥 REAL FIREBASE LOGIN
   Future<void> loginUser() async {
     final error = _getValidationError();
     
@@ -49,20 +53,50 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     }
 
     setState(() => _isLoading = true);
-    
-    // Simulating network delay
-    await Future.delayed(const Duration(milliseconds: 1000));
 
-    if (mounted) {
-      setState(() => _isLoading = false);
-      _showSnackBar("Login Successful!", Colors.green);
-      
-      // ✅ Using the correct route from AppRoutes to go Home
-      Navigator.pushNamedAndRemoveUntil(
-        context, 
-        '/home', 
-        (route) => false,
+    try {
+      await _auth.signInWithEmailAndPassword(
+        email: emailController.text.trim(),
+        password: passwordController.text.trim(),
       );
+
+      if (mounted) {
+        _showSnackBar("Welcome back to PetVerse!", Colors.green);
+        Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
+      }
+    } on FirebaseAuthException catch (e) {
+      _shakeController.forward(from: 0.0);
+      String msg = "Login failed";
+      if (e.code == 'user-not-found') msg = "No account found for this email.";
+      else if (e.code == 'wrong-password') msg = "Incorrect password.";
+      else if (e.code == 'invalid-credential') msg = "Invalid email or password.";
+      
+      _showSnackBar(msg, Colors.redAccent);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  // 🔥 REAL FIREBASE PASSWORD RESET
+  Future<void> _resetPassword() async {
+    final email = forgotPassController.text.trim();
+
+    if (email.isEmpty) {
+      _showSnackBar("Please enter your email address.", Colors.redAccent);
+      return;
+    }
+
+    try {
+      await _auth.sendPasswordResetEmail(email: email);
+      if (mounted) {
+        Navigator.pop(context); // Close the bottom sheet
+        _showSnackBar("Reset link sent to $email!", Colors.orange);
+        forgotPassController.clear();
+      }
+    } on FirebaseAuthException catch (e) {
+      _showSnackBar(e.message ?? "Failed to send reset link.", Colors.redAccent);
+    } catch (e) {
+      _showSnackBar("Something went wrong. Try again.", Colors.redAccent);
     }
   }
 
@@ -70,8 +104,12 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
-      builder: (context) => Padding(
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+        ),
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom,
           left: 24, right: 24, top: 32
@@ -80,29 +118,34 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text("Reset Password", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, fontFamily: 'Poppins')),
+            Center(
+              child: Container(
+                width: 50, height: 5,
+                decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text("Forgot Password?", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, fontFamily: 'Poppins')),
             const SizedBox(height: 8),
-            const Text("Enter your email for a recovery link.", style: TextStyle(color: Colors.grey, fontSize: 14, fontFamily: 'Poppins')),
+            const Text("Enter your registered email to receive a recovery link.", style: TextStyle(color: Colors.grey, fontSize: 14, fontFamily: 'Poppins')),
             const SizedBox(height: 24),
             _buildTextField(
               controller: forgotPassController, 
               label: "Recovery Email", 
               icon: Icons.email_outlined
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 30),
             ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _showSnackBar("Link sent!", Colors.orange);
-              },
+              onPressed: _resetPassword, // ✅ Real logic linked here
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.orange,
                 minimumSize: const Size(double.infinity, 55),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                elevation: 0,
               ),
-              child: const Text("SEND LINK", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              child: const Text("SEND RESET LINK", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 40),
           ],
         ),
       ),
@@ -112,11 +155,11 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   void _showSnackBar(String message, Color color) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message, style: const TextStyle(fontFamily: 'Poppins')),
+        content: Text(message, style: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w500)),
         backgroundColor: color,
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(20),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
       ),
     );
   }
@@ -136,34 +179,52 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       backgroundColor: Colors.white,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 30.0),
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 24.0),
           child: Column(
             children: [
-              const SizedBox(height: 40),
-              Image.asset(
-                'assets/images/onboarding_page1.png', 
-                height: 150, 
-                errorBuilder: (context, _, _) => const Icon(Icons.pets, size: 80, color: Colors.orange)
+              const SizedBox(height: 60),
+              // Brand Logo Illustration
+              Container(
+                height: 160,
+                width: 160,
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Image.asset(
+                    'assets/images/onboarding_page1.png', 
+                    height: 100, 
+                    errorBuilder: (context, _, _) => const Icon(Icons.pets_rounded, size: 80, color: Colors.orange)
+                  ),
+                ),
               ),
-              const SizedBox(height: 20),
-              const Text("Welcome Back!", style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, fontFamily: 'Poppins')),
-              const Text("Login to your PetVerse account", style: TextStyle(color: Colors.grey, fontFamily: 'Poppins')),
-              const SizedBox(height: 30),
+              const SizedBox(height: 32),
+              const Text("Welcome Back!", style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold, fontFamily: 'Poppins', letterSpacing: -0.5)),
+              const SizedBox(height: 8),
+              const Text("PetVerse: Your Pet's Best Friend", style: TextStyle(color: Colors.grey, fontSize: 15, fontFamily: 'Poppins')),
+              const SizedBox(height: 40),
 
+              // Inputs with Shake Animation
               AnimatedBuilder(
                 animation: _shakeController,
                 builder: (context, child) {
-                  final sineValue = sin(3 * pi * _shakeController.value);
-                  return Transform.translate(offset: Offset(sineValue * 10, 0), child: child);
+                  final sineValue = sin(4 * pi * _shakeController.value);
+                  return Transform.translate(offset: Offset(sineValue * 8, 0), child: child);
                 },
                 child: Column(
                   children: [
-                    _buildTextField(controller: emailController, label: "Email Address", icon: Icons.email_outlined),
-                    const SizedBox(height: 15),
+                    _buildTextField(
+                      controller: emailController, 
+                      label: "Email Address", 
+                      icon: Icons.email_outlined
+                    ),
+                    const SizedBox(height: 20),
                     _buildTextField(
                       controller: passwordController, 
                       label: "Password", 
-                      icon: Icons.lock_outline,
+                      icon: Icons.lock_outline_rounded,
                       isPassword: true,
                       obscureText: !_isPasswordVisible,
                       toggleVisibility: () => setState(() => _isPasswordVisible = !_isPasswordVisible),
@@ -176,42 +237,54 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                 alignment: Alignment.centerRight,
                 child: TextButton(
                   onPressed: _showForgotPasswordSheet,
-                  child: const Text("Forgot Password?", style: TextStyle(color: Colors.orange, fontFamily: 'Poppins'))
+                  child: const Text("Forgot Password?", style: TextStyle(color: Colors.orange, fontWeight: FontWeight.w600, fontFamily: 'Poppins'))
                 ),
               ),
 
-              const SizedBox(height: 10),
+              const SizedBox(height: 20),
 
+              // Login Button
               ElevatedButton(
                 onPressed: _isLoading ? null : loginUser,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.orange,
                   minimumSize: const Size(double.infinity, 60),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                  elevation: 2,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  elevation: 4,
+                  shadowColor: Colors.orange.withOpacity(0.3),
                 ),
                 child: _isLoading
-                    ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                    : const Text("LOG IN", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 1.1, fontFamily: 'Poppins')),
+                    ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
+                    : const Text("LOG IN", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 1.2, fontFamily: 'Poppins')),
               ),
               
-              const SizedBox(height: 25),
-              const Text("OR", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold, fontFamily: 'Poppins')),
-              const SizedBox(height: 25),
+              const SizedBox(height: 30),
+              Row(
+                children: [
+                  Expanded(child: Divider(color: Colors.grey.shade300, thickness: 1)),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16),
+                    child: Text("OR", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w600, fontFamily: 'Poppins')),
+                  ),
+                  Expanded(child: Divider(color: Colors.grey.shade300, thickness: 1)),
+                ],
+              ),
+              const SizedBox(height: 30),
 
+              // Google Social Button
               _socialButton(
                 label: "Continue with Google",
-                iconAsset: Icons.g_mobiledata, 
-                color: Colors.white,
-                textColor: Colors.black87,
-                onTap: () => loginUser(), 
+                iconAsset: Icons.g_mobiledata_rounded, 
+                onTap: () {
+                  // Link your GoogleSignIn method here later
+                }, 
               ),
 
-              const SizedBox(height: 30),
+              const SizedBox(height: 40),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center, 
                 children: [
-                  const Text("Don't have an account? ", style: TextStyle(fontFamily: 'Poppins')),
+                  const Text("Don't have an account? ", style: TextStyle(fontFamily: 'Poppins', color: Colors.black54)),
                   GestureDetector(
                     onTap: () => Navigator.pushNamed(context, '/signup'),
                     child: const Text("Sign Up", style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontFamily: 'Poppins')),
@@ -226,39 +299,70 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     );
   }
 
-  Widget _socialButton({required String label, required IconData iconAsset, required Color color, required Color textColor, required VoidCallback onTap}) {
+  Widget _socialButton({required String label, required IconData iconAsset, required VoidCallback onTap}) {
     return SizedBox(
       width: double.infinity,
-      height: 55,
+      height: 58,
       child: OutlinedButton.icon(
         onPressed: onTap,
-        icon: Icon(iconAsset, color: textColor, size: 28),
-        label: Text(label, style: TextStyle(color: textColor, fontSize: 16, fontWeight: FontWeight.w600, fontFamily: 'Poppins')),
+        icon: Icon(iconAsset, color: Colors.black, size: 32),
+        label: Text(label, style: const TextStyle(color: Colors.black87, fontSize: 16, fontWeight: FontWeight.w600, fontFamily: 'Poppins')),
         style: OutlinedButton.styleFrom(
-          backgroundColor: color,
-          side: BorderSide(color: Colors.grey.shade300),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          backgroundColor: Colors.white,
+          side: BorderSide(color: Colors.grey.shade200, width: 1.5),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         ),
       ),
     );
   }
 
-  Widget _buildTextField({required TextEditingController controller, required String label, required IconData icon, bool isPassword = false, bool obscureText = false, VoidCallback? toggleVisibility}) {
+  Widget _buildTextField({
+    required TextEditingController controller, 
+    required String label, 
+    required IconData icon, 
+    bool isPassword = false, 
+    bool obscureText = false, 
+    VoidCallback? toggleVisibility
+  }) {
     return Container(
-      decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(15)),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          )
+        ]
+      ),
       child: TextField(
         controller: controller,
         obscureText: obscureText,
-        style: const TextStyle(fontFamily: 'Poppins'),
+        style: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w500),
         decoration: InputDecoration(
           hintText: label,
-          hintStyle: const TextStyle(fontFamily: 'Poppins', color: Colors.grey),
-          prefixIcon: Icon(icon, color: Colors.orange),
+          hintStyle: TextStyle(fontFamily: 'Poppins', color: Colors.grey.shade400, fontSize: 15),
+          prefixIcon: Icon(icon, color: Colors.orange, size: 22),
           suffixIcon: isPassword 
-            ? IconButton(icon: Icon(obscureText ? Icons.visibility_off : Icons.visibility, color: Colors.grey), onPressed: toggleVisibility) 
+            ? IconButton(
+                icon: Icon(obscureText ? Icons.visibility_off_outlined : Icons.visibility_outlined, color: Colors.grey.shade400), 
+                onPressed: toggleVisibility
+              ) 
             : null,
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(vertical: 18),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(20),
+            borderSide: BorderSide(color: Colors.grey.shade100),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(20),
+            borderSide: BorderSide(color: Colors.grey.shade100),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(20),
+            borderSide: const BorderSide(color: Colors.orange, width: 1.5),
+          ),
+          contentPadding: const EdgeInsets.symmetric(vertical: 20, horizontal: 20),
         ),
       ),
     );
